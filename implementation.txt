@@ -1,0 +1,319 @@
+# 🚀 Evermark Implementation Roadmap
+
+## 🎯 **Current Status & Immediate Goals**
+
+### ✅ **What's Working**
+- Voting functionality is operational (first vote recorded on-chain!)
+- Basic Farcaster Frame metadata in place
+- Core Evermark creation and display functionality
+- Wallet integration with Thirdweb
+- Basic leaderboard structure
+
+### 🔥 **Critical Issues to Fix**
+1. **Leaderboard not showing votes** - Hook is hardcoded to return empty data
+2. **Missing Farcaster Mini App manifest** - Need proper `.well-known/farcaster.json`
+3. **No current week data** - Leaderboard only shows previous week
+4. **Missing command-based interactions** - No !evermark command system
+
+---
+
+## 📋 **Phase 1: Core Functionality Fixes (Week 1)**
+
+### Priority 1A: Fix Leaderboard Data Flow
+- [x] **Replace `useLeaderboard` hook** with version that fetches real voting data
+- [x] **Update LeaderboardPage** to show current + previous week tabs
+- [ ] **Test voting → leaderboard flow** end-to-end
+- [ ] **Verify vote counting accuracy** against blockchain data
+
+### Priority 1B: Farcaster Mini App Compliance  
+- [ ] **Create signed manifest** using Warpcast Developer tools
+- [ ] **Deploy `farcaster.json`** at `/.well-known/farcaster.json`
+- [ ] **Create required assets**:
+  - `icon.png` (256x256px)
+  - `og-image.png` (1200x630px) 
+  - `splash.png` (256x256px)
+  - Screenshots for app store
+- [ ] **Update HTML meta tags** for proper frame embeds
+- [ ] **Test mini app launch** from Warpcast
+
+---
+
+## 🎨 **Phase 2: Enhanced Mini App Experience (Week 2)**
+
+### Priority 2A: Farcaster SDK Integration
+- [ ] **Install `@farcaster/frame-sdk`**
+- [ ] **Implement context-aware UI**:
+  - Show Farcaster user info when authenticated
+  - Hide/modify navigation for frame context
+  - Add "Save to Farcaster" functionality
+- [ ] **Add mobile-optimized layouts** for 424x695px modal
+
+### Priority 2B: User Authentication Improvements
+- [ ] **Farcaster Sign-In integration**
+- [ ] **Seamless wallet connection** for frame users
+- [ ] **User preference persistence** across sessions
+
+---
+
+## 🔔 **Phase 3: Notification System (Week 3)**
+
+### Webhook Infrastructure
+- [ ] **Implement webhook handler** at `/api/webhook`
+- [ ] **User token management** database/storage
+- [ ] **Signature verification** for Farcaster events
+
+### High-Value Notifications
+- [ ] **New Evermark created** → Notify followers
+- [ ] **Voting cycle ended** → Weekly leaderboard results  
+- [ ] **Rewards available** → Token claim notifications
+- [ ] **Auction started** → NFT auction alerts
+- [ ] **Weekly digest** → Top content summary
+
+---
+
+## 🎯 **Phase 4: !evermark Command System (Week 4)**
+
+> **🚀 BREAKTHROUGH FEATURE: Comment-to-Evermark**
+
+### Core Command System
+```
+User comments "!evermark" on any Farcaster cast
+→ Automatically creates Evermark of that content
+→ Preserves cast data, author, timestamp on blockchain
+→ Sends confirmation notification to user
+```
+
+### Technical Architecture
+
+#### 4A: Mention Detection System
+- [ ] **Webhook for mentions** - Listen for comments mentioning your bot
+- [ ] **Comment parsing** - Detect `!evermark` commands with optional parameters
+- [ ] **Cast data extraction** - Fetch original cast content, author, metadata
+- [ ] **Spam protection** - Rate limiting, user verification
+
+#### 4B: Automated Evermark Creation
+- [ ] **On-behalf-of minting** - Create Evermarks for authenticated users
+- [ ] **Metadata generation** - Auto-populate title, author, description from cast
+- [ ] **IPFS storage** - Store cast content + metadata permanently
+- [ ] **Transaction management** - Handle gas, retries, confirmations
+
+#### 4C: User Interaction Flow
+```
+1. User sees interesting cast
+2. Comments "!evermark [optional: custom title]"
+3. Bot detects mention, validates user
+4. Extracts cast data automatically
+5. Creates Evermark on user's behalf
+6. Sends confirmation with Evermark link
+7. Cast creator gets notification (optional)
+```
+
+### Command Variations
+```bash
+# Basic evermark
+!evermark
+
+# With custom title  
+!evermark "Amazing Web3 Analysis"
+
+# With tags
+!evermark #defi #analysis
+
+# Private evermark
+!evermark --private
+
+# Add to collection
+!evermark --collection "My DeFi Reads"
+```
+
+### Advanced Features
+- [ ] **Bulk commands** - `!evermark thread` for entire thread
+- [ ] **Collaborative curation** - Multiple users can evermark same content
+- [ ] **Auto-categorization** - AI-powered tagging based on content
+- [ ] **Quality filtering** - Only allow evermarking of substantial content
+
+---
+
+## 🛠 **Technical Implementation Details**
+
+### Webhook Handler Structure
+```typescript
+// /api/webhook endpoint
+export async function POST(request: Request) {
+  const event = await request.json();
+  
+  switch (event.type) {
+    case 'cast.mention':
+      return handleMentionEvent(event);
+    case 'cast.reply': 
+      return handleReplyEvent(event);
+    default:
+      return new Response('OK');
+  }
+}
+
+async function handleMentionEvent(event) {
+  // 1. Parse comment for !evermark command
+  // 2. Validate user permissions
+  // 3. Extract cast metadata
+  // 4. Create Evermark transaction
+  // 5. Send confirmation notification
+}
+```
+
+### Cast Data Extraction
+```typescript
+interface CastData {
+  hash: string;
+  author: {
+    fid: number;
+    username: string;
+    displayName: string;
+  };
+  text: string;
+  timestamp: number;
+  embeds: Array<{
+    url?: string;
+    castId?: string;
+  }>;
+  mentions: number[];
+  parentHash?: string; // For replies/quotes
+}
+```
+
+### Auto-Generated Evermark Metadata
+```typescript
+interface AutoEvermarkData {
+  title: string; // From user command or auto-generated
+  description: string; // Cast text content
+  author: string; // Original cast author
+  sourceUrl: string; // Warpcast URL to original cast
+  farcasterCastHash: string; // Permanent reference
+  preservedAt: number; // Timestamp when evermarked
+  preservedBy: {
+    fid: number;
+    username: string;
+  };
+  originalContent: {
+    text: string;
+    embeds: any[];
+    parentContext?: CastData; // If replying to something
+  };
+}
+```
+
+---
+
+## 📊 **Success Metrics & KPIs**
+
+### Engagement Metrics
+- **Daily active users** in mini app
+- **!evermark command usage** frequency  
+- **Notification click-through rates**
+- **Frame additions to favorites**
+- **Cross-platform sharing** (Farcaster → external)
+
+### Content Quality Metrics
+- **Average votes per Evermark**
+- **Leaderboard participation** rates
+- **Content discovery** through commands
+- **User retention** week-over-week
+
+### Technical Metrics
+- **Command response time** (<2 seconds)
+- **IPFS upload success rate** (>99%)
+- **Webhook reliability** (>99.9%)
+- **Transaction success rate** (>95%)
+
+---
+
+## 🎭 **User Experience Scenarios**
+
+### Scenario 1: Discovery & Quick Save
+```
+1. User browsing Farcaster feed
+2. Sees valuable technical thread
+3. Comments "!evermark Web3 Security Guide"  
+4. Gets instant confirmation
+5. Content preserved forever on blockchain
+6. Can share/vote/discuss in Evermark app
+```
+
+### Scenario 2: Collaborative Curation  
+```
+1. Multiple users evermark same popular cast
+2. Creates "collaborative evermark" with multiple preservers
+3. Voting power aggregated across all contributors
+4. Shared ownership and rewards
+```
+
+### Scenario 3: Content Creator Workflow
+```
+1. Creator publishes research thread
+2. Community evermarks with !evermark command
+3. Creator gets notifications about evermarks
+4. Can claim/verify official evermarks
+5. Earns rewards from auction proceeds
+```
+
+---
+
+## 🚀 **Launch Strategy**
+
+### Soft Launch (Internal Testing)
+- [ ] **Deploy to staging** with test webhook
+- [ ] **Invite 10-20 beta users** to test !evermark commands
+- [ ] **Gather feedback** on UX and reliability
+- [ ] **Fix critical issues** before public launch
+
+### Public Launch (Community Rollout)  
+- [ ] **Announce on Farcaster** with demo video
+- [ ] **Partner with Farcaster influencers** for initial usage
+- [ ] **Create tutorial content** and documentation
+- [ ] **Monitor system performance** and user feedback
+
+### Growth Phase (Viral Mechanics)
+- [ ] **Gamification elements** - Leaderboards for top curators
+- [ ] **Social proof** - Show evermark counts on profiles
+- [ ] **Cross-platform integration** - Share to Twitter, LinkedIn
+- [ ] **API for developers** - Let others build on evermark data
+
+---
+
+## 📅 **Implementation Timeline**
+
+### Week 1: Foundation
+- Fix leaderboard data display
+- Create proper Farcaster manifest
+- Deploy mini app assets
+
+### Week 2: Enhancement  
+- Integrate Farcaster SDK
+- Implement notifications
+- Optimize mobile experience
+
+### Week 3: Infrastructure
+- Build webhook system
+- Implement mention detection
+- Create automated Evermark flow
+
+### Week 4: Launch
+- Beta test !evermark commands
+- Gather feedback and iterate
+- Public launch with community
+
+### Ongoing: Growth
+- Analytics and optimization
+- Advanced features (collections, AI tagging)
+- Partnerships and integrations
+
+---
+
+## 🎯 **Next Immediate Actions**
+
+1. **🔥 TODAY**: Deploy fixed leaderboard hook
+2. **📱 THIS WEEK**: Create and deploy farcaster.json manifest  
+3. **🔔 NEXT WEEK**: Implement basic webhook handler
+4. **🚀 END OF MONTH**: Launch !evermark command system
+
+The !evermark command represents a breakthrough in seamless content curation - making blockchain preservation as simple as commenting on social media. This could be the killer feature that drives mainstream adoption! 🎉
