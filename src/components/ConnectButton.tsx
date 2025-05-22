@@ -1,7 +1,7 @@
 import React from 'react';
 import { ConnectButton } from "thirdweb/react";
 import { createWallet } from "thirdweb/wallets";
-import { client } from "../../lib/thirdweb";
+import { client } from "../lib/thirdweb";
 
 const wallets = [
   createWallet("io.metamask"),
