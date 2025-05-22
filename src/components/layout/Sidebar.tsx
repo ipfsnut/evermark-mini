@@ -8,7 +8,8 @@ import {
   Trophy as TrophyIcon,
   DollarSign as AuctionIcon,
   Plus as CreateIcon,
-  User as UserIcon
+  User as UserIcon,
+  Bookmark as BookmarkIcon
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     { path: '/create', label: 'Create', icon: <CreateIcon className="h-5 w-5" /> },
     { path: '/my-evermarks', label: 'My Collection', icon: <BookOpenIcon className="h-5 w-5" /> },
     { path: '/profile', label: 'Profile', icon: <UserIcon className="h-5 w-5" /> },
+    { path: '/bookshelf', label: 'My Bookshelf', icon: <BookmarkIcon className="h-5 w-5" /> },
   ];
   
   // Check if a nav item is active

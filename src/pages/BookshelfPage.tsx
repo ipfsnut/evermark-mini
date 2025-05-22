@@ -203,9 +203,9 @@ const BookshelfPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1">
                   {collection.isPublic ? (
-                    <GlobeIcon className="h-4 w-4 text-green-600" title="Public" />
+                    <GlobeIcon className="h-4 w-4 text-green-600" aria-label="Public" />
                   ) : (
-                    <LockIcon className="h-4 w-4 text-gray-400" title="Private" />
+                    <LockIcon className="h-4 w-4 text-gray-400" aria-label="Private" />
                   )}
                 </div>
               </div>
@@ -222,28 +222,28 @@ const BookshelfPage: React.FC = () => {
                   <button
                     onClick={() => exportCollection(collection)}
                     className="p-1 text-gray-500 hover:text-gray-700"
-                    title="Export"
+                    aria-label="Export"
                   >
                     <DownloadIcon className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => {/* TODO: Share functionality */}}
                     className="p-1 text-gray-500 hover:text-gray-700"
-                    title="Share"
+                    aria-label="Share"
                   >
                     <ShareIcon className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setEditingCollection(collection.id)}
                     className="p-1 text-gray-500 hover:text-gray-700"
-                    title="Edit"
+                    aria-label="Edit"
                   >
                     <EditIcon className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => deleteCollection(collection.id)}
                     className="p-1 text-red-500 hover:text-red-700"
-                    title="Delete"
+                    aria-label="Delete"
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>

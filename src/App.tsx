@@ -12,6 +12,7 @@ import EnhancedAuctionPage from './pages/EnhancedAuctionPage';
 import MyEvermarksPage from './pages/MyEvermarksPage';
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
 import { EvermarkDetail } from './components/evermark/EvermarkDetail';
+import BookshelfPage from './pages/BookshelfPage';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
           <Route path="/my-evermarks" element={<MyEvermarksPage />} />
           <Route path="/create" element={<EnhancedCreateEvermark />} />
           <Route path="/evermark/:id" element={<EvermarkDetail />} />
+          <Route path="/bookshelf" element={<BookshelfPage />} />
         </Routes>
       </Layout>
     </AppThirdwebProvider>
