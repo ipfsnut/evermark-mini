@@ -12,10 +12,18 @@ export const client = createThirdwebClient({
 });
 
 export function AppThirdwebProvider({ children }: PropsWithChildren) {
-  // Create a props object and use type assertion if needed
+  // Configure with reduced polling to prevent auto-refresh
   const providerProps = {
     client,
     activeChain: CHAIN,
+    // Reduce aggressive polling that might cause auto-refresh
+    queryOptions: {
+      refetchInterval: false, // Disable automatic refetching
+      refetchOnWindowFocus: false, // Don't refetch when window gains focus
+      refetchOnReconnect: false, // Don't refetch on network reconnect
+      staleTime: 60000, // Consider data fresh for 1 minute
+      cacheTime: 300000, // Keep data in cache for 5 minutes
+    }
   } as any;
 
   return (

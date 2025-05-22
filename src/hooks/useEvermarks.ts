@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+// Updated useEvermarks.ts with proper IPFS error handling
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getContract, readContract } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
@@ -9,128 +10,210 @@ export interface Evermark {
   author: string;
   description?: string;
   sourceUrl?: string;
+  image?: string;
   metadataURI: string;
   creator: string;
   creationTime: number;
   votes?: number;
 }
 
+// Helper function to fetch IPFS metadata with proper error handling
+const fetchIPFSMetadata = async (metadataURI: string) => {
+  // Default empty values
+  const defaultReturn = { description: "", sourceUrl: "", image: "" };
+  
+  if (!metadataURI || !metadataURI.startsWith('ipfs://')) {
+    return defaultReturn;
+  }
+
+  try {
+    const ipfsHash = metadataURI.replace('ipfs://', '');
+    
+    // Basic validation - IPFS hashes should be at least 40 characters
+    if (ipfsHash.length < 40) {
+      console.log('Invalid IPFS hash format:', ipfsHash);
+      return defaultReturn;
+    }
+    
+    const ipfsGatewayUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+    
+    // Add timeout and proper error handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    console.log('Fetching IPFS metadata from:', ipfsGatewayUrl);
+    
+    const response = await fetch(ipfsGatewayUrl, { 
+      signal: controller.signal,
+      cache: 'force-cache', // Use browser cache to reduce requests
+      headers: {
+        'Accept': 'application/json',
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      console.warn(`IPFS fetch failed with status ${response.status} for hash: ${ipfsHash}`);
+      return defaultReturn;
+    }
+    
+    const ipfsData = await response.json();
+    console.log('IPFS data fetched successfully:', ipfsData);
+    
+    return {
+      description: ipfsData.description || "",
+      sourceUrl: ipfsData.external_url || "",
+      image: ipfsData.image 
+        ? ipfsData.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/') 
+        : ""
+    };
+  } catch (error: unknown) {
+    // Properly type the error and handle it
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    
+    // Don't spam console with errors for expected failures
+    if (errorName !== 'AbortError') {
+      console.warn("Error fetching IPFS metadata:", errorMessage);
+    }
+    return defaultReturn;
+  }
+};
+
 export function useEvermarks() {
   const [evermarks, setEvermarks] = useState<Evermark[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastFetch, setLastFetch] = useState<number>(0);
 
-  // Memoize contract instance to prevent recreation
-  const contract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.EVERMARK_NFT,
-    abi: EVERMARK_NFT_ABI,
-  }), []);
+  // Memoize contract to prevent recreation
+  const contract = useMemo(() => {
+    return getContract({
+      client,
+      chain: CHAIN,
+      address: CONTRACTS.EVERMARK_NFT,
+      abi: EVERMARK_NFT_ABI,
+    });
+  }, []);
 
-  useEffect(() => {
-    let isMounted = true; // Prevent state updates if component unmounts
+  // Memoize the fetch function to prevent recreation
+  const fetchEvermarks = useCallback(async () => {
+    // Prevent refetching too frequently (max once per 30 seconds)
+    const now = Date.now();
+    if (now - lastFetch < 30000 && evermarks.length > 0) {
+      console.log('Skipping fetch - too recent');
+      return;
+    }
 
-    const fetchEvermarks = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // Get total supply
-        const totalSupply = await readContract({
-          contract,
-          method: "totalSupply",
-          params: [],
-        });
-        
-        // If no tokens have been minted yet
-        if (Number(totalSupply) === 0) {
-          if (isMounted) {
-            setEvermarks([]);
-            setIsLoading(false);
-          }
-          return;
-        }
-        
-        // Fetch the most recent tokens (up to 10)
-        const fetchedEvermarks: Evermark[] = [];
-        const startId = Number(totalSupply);
-        const endId = Math.max(1, startId - 10); // Get up to 10 most recent tokens
-        
-        for (let i = startId; i >= endId; i--) {
-          if (!isMounted) break; // Exit early if component unmounted
+    try {
+      setIsLoading(true);
+      setError(null);
+      setLastFetch(now);
+      
+      console.log('Fetching evermarks...');
+      
+      const totalSupply = await readContract({
+        contract,
+        method: "totalSupply",
+        params: [],
+      });
+      
+      if (Number(totalSupply) === 0) {
+        setEvermarks([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      const fetchedEvermarks: Evermark[] = [];
+      const startId = Number(totalSupply);
+      const endId = Math.max(1, startId - 10);
+      
+      for (let i = startId; i >= endId; i--) {
+        try {
+          const exists = await readContract({
+            contract,
+            method: "exists",
+            params: [BigInt(i)],
+          });
           
-          try {
-            // Check if token exists
-            const exists = await readContract({
-              contract,
-              method: "exists",
-              params: [BigInt(i)],
-            });
-            
-            if (!exists) continue;
-            
-            // Get metadata
-            const [title, author, metadataURI] = await readContract({
-              contract,
-              method: "getBookmarkMetadata",
-              params: [BigInt(i)],
-            });
-            
-            // Get creator
-            const creator = await readContract({
-              contract,
-              method: "getBookmarkCreator",
-              params: [BigInt(i)],
-            });
-            
-            // Get creation time
-            const creationTime = await readContract({
-              contract,
-              method: "getBookmarkCreationTime",
-              params: [BigInt(i)],
-            });
-            
-            // Add to evermarks
-            fetchedEvermarks.push({
-              id: i.toString(),
-              title,
-              author,
-              metadataURI,
-              creator,
-              creationTime: Number(creationTime) * 1000, // Convert to milliseconds
-              description: "", // We don't have this from the contract
-              sourceUrl: "" // We don't have this from the contract
-            });
-          } catch (err) {
-            console.error(`Error fetching token ${i}:`, err);
-          }
+          if (!exists) continue;
+          
+          const [title, author, metadataURI] = await readContract({
+            contract,
+            method: "getBookmarkMetadata",
+            params: [BigInt(i)],
+          });
+          
+          const creator = await readContract({
+            contract,
+            method: "getBookmarkCreator",
+            params: [BigInt(i)],
+          });
+          
+          const creationTime = await readContract({
+            contract,
+            method: "getBookmarkCreationTime",
+            params: [BigInt(i)],
+          });
+
+          // Fetch IPFS metadata including image (with proper error handling)
+          const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
+          
+          fetchedEvermarks.push({
+            id: i.toString(),
+            title,
+            author,
+            description,
+            sourceUrl,
+            image,
+            metadataURI,
+            creator,
+            creationTime: Number(creationTime) * 1000,
+          });
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+          console.error(`Error fetching token ${i}:`, errorMessage);
         }
-        
-        if (isMounted) {
-          setEvermarks(fetchedEvermarks);
-        }
-      } catch (err: any) {
-        console.error("Error fetching evermarks:", err);
-        if (isMounted) {
-          setError(err.message || "Failed to load evermarks");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+      }
+      
+      setEvermarks(fetchedEvermarks);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error("Error fetching evermarks:", errorMessage);
+      setError(errorMessage || "Failed to load evermarks");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [contract, lastFetch, evermarks.length]);
+
+  // Only fetch once on mount, not on every render
+  useEffect(() => {
+    let isMounted = true;
+    
+    const runFetch = async () => {
+      if (isMounted) {
+        await fetchEvermarks();
       }
     };
     
-    fetchEvermarks();
+    // Only fetch if we don't have data or it's been a while
+    if (evermarks.length === 0 || Date.now() - lastFetch > 60000) {
+      runFetch();
+    }
 
-    // Cleanup function
     return () => {
       isMounted = false;
     };
-  }, [contract]); // Only depend on the memoized contract
+  }, []); // Empty dependency array - only run once on mount
 
-  return { evermarks, isLoading, error };
+  // Provide a manual refresh function
+  const refresh = useCallback(() => {
+    setLastFetch(0); // Reset last fetch time to allow immediate refresh
+    fetchEvermarks();
+  }, [fetchEvermarks]);
+
+  return { evermarks, isLoading, error, refresh };
 }
 
 export function useEvermarkDetail(id: string) {
@@ -138,7 +221,6 @@ export function useEvermarkDetail(id: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Memoize contract instance
   const contract = useMemo(() => getContract({
     client,
     chain: CHAIN,
@@ -150,15 +232,8 @@ export function useEvermarkDetail(id: string) {
     let isMounted = true;
 
     const fetchEvermarkDetail = async () => {
-      if (!id) {
-        if (isMounted) {
-          setError("Invalid Evermark ID");
-          setIsLoading(false);
-        }
-        return;
-      }
+      if (!id || !isMounted) return;
 
-      // Handle the "new" ID placeholder case
       if (id === "new") {
         if (isMounted) {
           setError("Your Evermark is being created. Please check your collection once the transaction is confirmed.");
@@ -171,7 +246,6 @@ export function useEvermarkDetail(id: string) {
         setIsLoading(true);
         setError(null);
 
-        // Safely convert id to BigInt
         let tokenId;
         try {
           tokenId = BigInt(id);
@@ -183,7 +257,6 @@ export function useEvermarkDetail(id: string) {
           return;
         }
 
-        // Check if token exists first
         const exists = await readContract({
           contract,
           method: "exists",
@@ -198,46 +271,26 @@ export function useEvermarkDetail(id: string) {
           return;
         }
 
-        // Get metadata
         const [title, author, metadataURI] = await readContract({
           contract,
           method: "getBookmarkMetadata",
           params: [tokenId],
         });
 
-        // Get creator
         const creator = await readContract({
           contract,
           method: "getBookmarkCreator",
           params: [tokenId],
         });
 
-        // Get creation time
         const creationTime = await readContract({
           contract,
           method: "getBookmarkCreationTime",
           params: [tokenId],
         });
 
-        // If metadata URI is IPFS, fetch additional data
-        let description = "";
-        let sourceUrl = "";
-        
-        if (metadataURI && metadataURI.startsWith('ipfs://')) {
-          try {
-            const ipfsHash = metadataURI.replace('ipfs://', '');
-            const ipfsGatewayUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
-            const response = await fetch(ipfsGatewayUrl);
-            
-            if (response.ok) {
-              const ipfsData = await response.json();
-              description = ipfsData.description || "";
-              sourceUrl = ipfsData.external_url || "";
-            }
-          } catch (ipfsError) {
-            console.error("Error fetching IPFS metadata:", ipfsError);
-          }
-        }
+        // Fetch IPFS metadata including image (with proper error handling)
+        const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
 
         if (isMounted) {
           setEvermark({
@@ -246,15 +299,17 @@ export function useEvermarkDetail(id: string) {
             author,
             description,
             sourceUrl,
+            image,
             metadataURI,
             creator,
             creationTime: Number(creationTime) * 1000,
           });
         }
-      } catch (err: any) {
-        console.error("Error fetching Evermark:", err);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        console.error("Error fetching Evermark:", errorMessage);
         if (isMounted) {
-          setError(err.message || "Failed to load Evermark details");
+          setError(errorMessage || "Failed to load Evermark details");
         }
       } finally {
         if (isMounted) {
@@ -268,7 +323,7 @@ export function useEvermarkDetail(id: string) {
     return () => {
       isMounted = false;
     };
-  }, [id, contract]); // Dependencies: id and memoized contract
+  }, [id, contract]);
 
   return { evermark, isLoading, error };
 }
@@ -277,8 +332,8 @@ export function useUserEvermarks(userAddress?: string) {
   const [evermarks, setEvermarks] = useState<Evermark[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastFetch, setLastFetch] = useState<number>(0);
 
-  // Memoize contract instance
   const contract = useMemo(() => getContract({
     client,
     chain: CHAIN,
@@ -290,7 +345,7 @@ export function useUserEvermarks(userAddress?: string) {
     let isMounted = true;
 
     const fetchUserEvermarks = async () => {
-      if (!userAddress) {
+      if (!userAddress || !isMounted) {
         if (isMounted) {
           setEvermarks([]);
           setIsLoading(false);
@@ -298,11 +353,17 @@ export function useUserEvermarks(userAddress?: string) {
         return;
       }
 
+      // Prevent refetching too frequently
+      const now = Date.now();
+      if (now - lastFetch < 30000 && evermarks.length > 0) {
+        return;
+      }
+
       try {
         setIsLoading(true);
         setError(null);
+        setLastFetch(now);
 
-        // Get balance of user
         const balance = await readContract({
           contract,
           method: "balanceOf",
@@ -317,7 +378,6 @@ export function useUserEvermarks(userAddress?: string) {
           return;
         }
 
-        // Get total supply to know the range we need to check
         const totalSupply = await readContract({
           contract,
           method: "totalSupply",
@@ -326,10 +386,8 @@ export function useUserEvermarks(userAddress?: string) {
 
         const userEvermarks: Evermark[] = [];
 
-        // Loop through all token IDs and check ownership
         for (let i = 1; i <= Number(totalSupply) && isMounted; i++) {
           try {
-            // Check if token exists
             const exists = await readContract({
               contract,
               method: "exists",
@@ -338,68 +396,63 @@ export function useUserEvermarks(userAddress?: string) {
 
             if (!exists) continue;
 
-            try {
-              // Get token owner
-              const owner = await readContract({
-                contract,
-                method: "ownerOf",
-                params: [BigInt(i)],
-              });
+            const owner = await readContract({
+              contract,
+              method: "ownerOf",
+              params: [BigInt(i)],
+            });
 
-              // Skip if not owned by user
-              if (owner.toLowerCase() !== userAddress.toLowerCase()) continue;
+            if (owner.toLowerCase() !== userAddress.toLowerCase()) continue;
 
-              // Get metadata
-              const [title, author, metadataURI] = await readContract({
-                contract,
-                method: "getBookmarkMetadata",
-                params: [BigInt(i)],
-              });
+            const [title, author, metadataURI] = await readContract({
+              contract,
+              method: "getBookmarkMetadata",
+              params: [BigInt(i)],
+            });
 
-              // Get creator
-              const creator = await readContract({
-                contract,
-                method: "getBookmarkCreator",
-                params: [BigInt(i)],
-              });
+            const creator = await readContract({
+              contract,
+              method: "getBookmarkCreator",
+              params: [BigInt(i)],
+            });
 
-              // Get creation time
-              const creationTime = await readContract({
-                contract,
-                method: "getBookmarkCreationTime",
-                params: [BigInt(i)],
-              });
+            const creationTime = await readContract({
+              contract,
+              method: "getBookmarkCreationTime",
+              params: [BigInt(i)],
+            });
 
-              // Add to user's evermarks
-              userEvermarks.push({
-                id: i.toString(),
-                title,
-                author,
-                metadataURI,
-                creator,
-                creationTime: Number(creationTime) * 1000,
-              });
+            // Fetch IPFS metadata including image (with proper error handling)
+            const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
 
-              // If we found all of the user's tokens, we can stop
-              if (userEvermarks.length >= Number(balance)) {
-                break;
-              }
-            } catch (err) {
-              console.error(`Error checking ownership for token ${i}:`, err);
-              // Continue to next token
+            userEvermarks.push({
+              id: i.toString(),
+              title,
+              author,
+              description,
+              sourceUrl,
+              image,
+              metadataURI,
+              creator,
+              creationTime: Number(creationTime) * 1000,
+            });
+
+            if (userEvermarks.length >= Number(balance)) {
+              break;
             }
           } catch (err) {
-            console.error(`Error checking if token ${i} exists:`, err);
+            console.error(`Error checking ownership for token ${i}:`, err);
           }
         }
 
         if (isMounted) {
           setEvermarks(userEvermarks);
         }
-      } catch (err: any) {
-        console.error("Error fetching user evermarks:", err);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        console.error("Error fetching user evermarks:", errorMessage);
         if (isMounted) {
-          setError(err.message || "Failed to load your Evermarks");
+          setError(errorMessage || "Failed to load your Evermarks");
         }
       } finally {
         if (isMounted) {
@@ -408,12 +461,18 @@ export function useUserEvermarks(userAddress?: string) {
       }
     };
 
-    fetchUserEvermarks();
+    // Only fetch if userAddress exists and we don't have recent data
+    if (userAddress && (evermarks.length === 0 || Date.now() - lastFetch > 60000)) {
+      fetchUserEvermarks();
+    } else if (!userAddress) {
+      setEvermarks([]);
+      setIsLoading(false);
+    }
 
     return () => {
       isMounted = false;
     };
-  }, [userAddress, contract]); // Dependencies: userAddress and memoized contract
+  }, [userAddress]);
 
   return { evermarks, isLoading, error };
 }

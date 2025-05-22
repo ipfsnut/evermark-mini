@@ -1,61 +1,95 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useActiveAccount } from "thirdweb/react";
-import { PlusIcon, BookOpenIcon, TrendingUpIcon, ExternalLinkIcon } from 'lucide-react';
+import { PlusIcon, BookOpenIcon, TrendingUpIcon, ExternalLinkIcon, ImageIcon, UserIcon } from 'lucide-react';
 import { useEvermarks } from '../hooks/useEvermarks';
-import { useReadContract } from "thirdweb/react";
-import { getContract } from "thirdweb";
-import { client } from "../lib/thirdweb";
-import { CHAIN, CONTRACTS, VOTING_ABI, CARD_CATALOG_ABI } from "../lib/contracts";
-import { useAuctions } from '../hooks/useAuctions';
 import { formatDistanceToNow, format } from 'date-fns';
 import PageContainer from '../components/layout/PageContainer';
+
+// Component for individual evermark with image
+const EvermarkListItem: React.FC<{ evermark: any }> = ({ evermark }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+
+  const handleImageLoad = () => setImageLoading(false);
+  const handleImageError = () => {
+    setImageError(true);
+    setImageLoading(false);
+  };
+
+  return (
+    <Link 
+      to={`/evermark/${evermark.id}`}
+      className="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+    >
+      <div className="flex items-center">
+        {/* Image section - 1/3 of the content area */}
+        <div className="w-20 h-20 bg-gray-100 rounded-lg mr-4 flex-shrink-0 overflow-hidden">
+          {evermark.image && !imageError ? (
+            <div className="relative w-full h-full">
+              {imageLoading && (
+                <div className="absolute inset-0 bg-gray-200 animate-pulse rounded-lg"></div>
+              )}
+              <img
+                src={evermark.image}
+                alt={evermark.title}
+                className="w-full h-full object-cover rounded-lg"
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+              />
+            </div>
+          ) : (
+            <div className="w-full h-full bg-gray-100 flex items-center justify-center rounded-lg">
+              <ImageIcon className="h-8 w-8 text-gray-400" />
+            </div>
+          )}
+        </div>
+        
+        {/* Content section - 2/3 of the content area */}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-gray-900 truncate">{evermark.title}</h3>
+          <div className="text-sm text-gray-600 flex items-center gap-2 mt-1">
+            <UserIcon className="h-3 w-3" />
+            <span>by {evermark.author}</span>
+            <span className="text-gray-400">•</span>
+            <span>{formatDistanceToNow(new Date(evermark.creationTime), { addSuffix: true })}</span>
+          </div>
+          {evermark.description && (
+            <p className="text-sm text-gray-600 mt-2 line-clamp-2">{evermark.description}</p>
+          )}
+        </div>
+        
+        {/* Actions section */}
+        <div className="flex items-center gap-2 ml-4">
+          {evermark.metadataURI && evermark.metadataURI.startsWith('ipfs://') && (
+            <a 
+              href={evermark.metadataURI.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-purple-600 hover:text-purple-800 p-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLinkIcon className="h-4 w-4" />
+            </a>
+          )}
+          <BookOpenIcon className="h-5 w-5 text-purple-600" />
+        </div>
+      </div>
+    </Link>
+  );
+};
 
 const EnhancedHomePage: React.FC = () => {
   const account = useActiveAccount();
   const isConnected = !!account;
   const { evermarks, isLoading } = useEvermarks();
-  const { auctions } = useAuctions();
-  
-  // Memoize contract instances to prevent recreation on every render
-  const votingContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.VOTING,
-    abi: VOTING_ABI,
-  }), []);
-  
-  const catalogContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.CARD_CATALOG,
-    abi: CARD_CATALOG_ABI,
-  }), []);
-  
-  // Get voting stats
-  const { data: currentCycle } = useReadContract({
-    contract: votingContract,
-    method: "getCurrentCycle",
-    params: [],
-  });
 
-  // Get total voting power (active voters)
-  const { data: totalSupply } = useReadContract({
-    contract: catalogContract,
-    method: "totalSupply",
-    params: [],
-  });
-
-  // Memoize date calculations to prevent recalculation on every render
-  const weekDisplay = useMemo(() => {
-    const today = new Date();
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay()); // Set to Sunday
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6); // Set to Saturday
-    
-    return `${format(startOfWeek, 'MMM d')} - ${format(endOfWeek, 'MMM d')}`;
-  }, []);
+  // Static stats to prevent constant refetching
+  const stats = useMemo(() => ({
+    totalEvermarks: evermarks.length,
+    currentCycle: 1, // Static for now to prevent auto-refresh
+    activeAuctions: 0, // Static for now to prevent auto-refresh
+  }), [evermarks.length]);
 
   // Memoize recent evermarks to prevent recalculation
   const recentEvermarks = useMemo(() => {
@@ -107,7 +141,7 @@ const EnhancedHomePage: React.FC = () => {
               <div>
                 <p className="text-sm text-gray-600">Total Evermarks</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {isLoading ? "..." : evermarks.length}
+                  {isLoading ? "..." : stats.totalEvermarks}
                 </p>
               </div>
             </div>
@@ -119,7 +153,7 @@ const EnhancedHomePage: React.FC = () => {
               <div>
                 <p className="text-sm text-gray-600">Current Cycle</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {currentCycle ? currentCycle.toString() : "0"}
+                  {stats.currentCycle}
                 </p>
               </div>
             </div>
@@ -133,7 +167,7 @@ const EnhancedHomePage: React.FC = () => {
               <div>
                 <p className="text-sm text-gray-600">Active Auctions</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {auctions ? auctions.length : "0"}
+                  {stats.activeAuctions}
                 </p>
               </div>
             </div>
@@ -146,9 +180,16 @@ const EnhancedHomePage: React.FC = () => {
           
           {isLoading ? (
             <div className="animate-pulse space-y-4">
-              <div className="h-12 bg-gray-200 rounded"></div>
-              <div className="h-12 bg-gray-200 rounded"></div>
-              <div className="h-12 bg-gray-200 rounded"></div>
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center p-4 border border-gray-200 rounded-lg">
+                  <div className="w-20 h-20 bg-gray-200 rounded-lg mr-4"></div>
+                  <div className="flex-1">
+                    <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : evermarks.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
@@ -158,42 +199,13 @@ const EnhancedHomePage: React.FC = () => {
           ) : (
             <div className="space-y-4">
               {recentEvermarks.map(evermark => (
-                <Link 
-                  key={evermark.id} 
-                  to={`/evermark/${evermark.id}`}
-                  className="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium text-gray-900">{evermark.title}</h3>
-                      <div className="text-sm text-gray-600 flex items-center gap-2">
-                        <span>by {evermark.author}</span>
-                        <span className="text-gray-400">•</span>
-                        <span>{formatDistanceToNow(new Date(evermark.creationTime), { addSuffix: true })}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {evermark.metadataURI && evermark.metadataURI.startsWith('ipfs://') && (
-                        <a 
-                          href={evermark.metadataURI.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-purple-600 hover:text-purple-800 p-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <ExternalLinkIcon className="h-4 w-4" />
-                        </a>
-                      )}
-                      <BookOpenIcon className="h-5 w-5 text-purple-600" />
-                    </div>
-                  </div>
-                </Link>
+                <EvermarkListItem key={evermark.id} evermark={evermark} />
               ))}
               
               {evermarks.length > 5 && (
                 <div className="text-center pt-2">
                   <Link 
-                    to="/explore" 
+                    to="/my-evermarks" 
                     className="inline-flex items-center text-purple-600 hover:text-purple-700"
                   >
                     View All

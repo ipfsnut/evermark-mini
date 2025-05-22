@@ -1,12 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useWallet } from "../../hooks/useWallet";
-import { useEvermarkCreation } from "../../hooks/useEvermarkCreation";
+import { useEvermarkCreation, type EvermarkMetadata } from "../../hooks/useEvermarkCreation";
 import { 
   PlusIcon, 
   LinkIcon, 
   AlertCircleIcon, 
   CheckCircleIcon,
   UploadIcon,
+  ImageIcon,
+  XIcon,
+  LoaderIcon,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import PageContainer from '../layout/PageContainer';
@@ -20,6 +23,48 @@ export function EnhancedCreateEvermark() {
   const [description, setDescription] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [author, setAuthor] = useState("");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setImageUploadError('Please select a valid image file');
+      return;
+    }
+    
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setImageUploadError('Image must be smaller than 10MB');
+      return;
+    }
+    
+    setSelectedImage(file);
+    setImageUploadError(null);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  const removeImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    setImageUploadError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,12 +73,15 @@ export function EnhancedCreateEvermark() {
       return;
     }
     
-    const result = await createEvermark({
+    const evermarkData: EvermarkMetadata = {
       title,
       description,
       sourceUrl,
-      author
-    });
+      author,
+      imageFile: selectedImage, // Pass the image file to the hook
+    };
+    
+    const result = await createEvermark(evermarkData);
     
     if (result.success && result.evermarkId) {
       // Redirect to the collection page after 2 seconds
@@ -101,6 +149,62 @@ export function EnhancedCreateEvermark() {
       )}
       
       <div className="bg-white rounded-lg shadow-sm p-6">
+        {/* Image Upload Section */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+            <ImageIcon className="h-4 w-4 mr-2" />
+            Cover Image (Optional)
+          </h3>
+          
+          {!imagePreview ? (
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <p className="text-gray-600 mb-2">Click to upload an image</p>
+              <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+            </div>
+          ) : (
+            <div className="relative">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-full h-48 object-cover rounded-lg"
+              />
+              <button
+                type="button"
+                onClick={removeImage}
+                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+              <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                {selectedImage?.name}
+              </div>
+            </div>
+          )}
+          
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+          
+          {imageUploadError && (
+            <p className="mt-2 text-sm text-red-600">{imageUploadError}</p>
+          )}
+          
+          {isUploadingImage && (
+            <div className="mt-2 flex items-center text-sm text-purple-600">
+              <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
+              Uploading image to IPFS...
+            </div>
+          )}
+        </div>
+        
         {/* Source URL with Auto-Detect */}
         <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
           <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
@@ -181,7 +285,7 @@ export function EnhancedCreateEvermark() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isCreating || !title.trim()}
+            disabled={isCreating || !title.trim() || isUploadingImage}
             className="w-full flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isCreating ? (
@@ -203,6 +307,7 @@ export function EnhancedCreateEvermark() {
       <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <h4 className="text-sm font-medium text-blue-900 mb-2">Tips:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
+          <li>• Add a cover image to make your Evermark more visually appealing</li>
           <li>• Use descriptive titles that capture the essence of your content</li>
           <li>• Include the original author's name when preserving others' work</li>
           <li>• Add a description explaining why this content is valuable</li>
