@@ -1,18 +1,19 @@
-module.exports = {
+/** @type {import('tailwindcss').Config} */
+export default {
   content: [
-    "./src/**/*.{js,jsx,ts,tsx}",
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
       colors: {
-        // You can customize your brand colors
         primary: {
           50: '#f5f3ff',
           100: '#ede9fe',
           200: '#ddd6fe',
           300: '#c4b5fd',
           400: '#a78bfa',
-          500: '#8b5cf6', // This is the base purple color
+          500: '#8b5cf6',
           600: '#7c3aed',
           700: '#6d28d9',
           800: '#5b21b6',
@@ -21,10 +22,23 @@ module.exports = {
         },
       },
       fontFamily: {
-        // Add custom fonts if needed
         serif: ['Georgia', 'serif'],
-        sans: ['Inter', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
       },
+      animation: {
+        'fadeIn': 'fadeIn 0.5s ease-in-out',
+        'slideIn': 'slideIn 0.5s ease-out',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideIn: {
+          '0%': { transform: 'translateY(20px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        }
+      }
     },
   },
   plugins: [],

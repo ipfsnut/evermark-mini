@@ -2,7 +2,7 @@ import { useReadContract, useSendTransaction } from "thirdweb/react";
 import { getContract, prepareContractCall, readContract } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, AUCTION_ABI } from "../lib/contracts";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { toEther, toWei } from "thirdweb/utils";
 
 export interface AuctionDetails {
@@ -24,12 +24,13 @@ export function useAuctions() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const auctionContract = getContract({
+  // Memoize the contract instance
+  const auctionContract = useMemo(() => getContract({
     client,
     chain: CHAIN,
     address: CONTRACTS.AUCTION,
     abi: AUCTION_ABI,
-  });
+  }), []);
   
   // Get active auctions
   const { data: activeAuctionIds, isLoading: isLoadingIds } = useReadContract({
@@ -40,27 +41,33 @@ export function useAuctions() {
   
   // Fetch details for each auction
   useEffect(() => {
+    let isMounted = true;
+
     const fetchAuctionDetails = async () => {
-      if (isLoadingIds) {
+      if (isLoadingIds || !isMounted) {
         return;
       }
       
       setIsLoading(true);
+      setError(null);
       
       try {
-        const fetchedAuctions: AuctionDetails[] = [];
-        
         // If no auctions are found from the contract or we're still loading
         if (!activeAuctionIds || activeAuctionIds.length === 0) {
           console.log("No active auctions found from contract");
-          // Always use an empty array to ensure we're showing real data
-          setAuctions([]);
-          setIsLoading(false);
+          if (isMounted) {
+            setAuctions([]);
+            setIsLoading(false);
+          }
           return;
         }
         
+        const fetchedAuctions: AuctionDetails[] = [];
+        
         // Process real auction data
         for (const auctionId of activeAuctionIds) {
+          if (!isMounted) break;
+          
           try {
             const details = await readContract({
               contract: auctionContract,
@@ -77,16 +84,26 @@ export function useAuctions() {
           }
         }
         
-        setAuctions(fetchedAuctions);
+        if (isMounted) {
+          setAuctions(fetchedAuctions);
+        }
       } catch (err: any) {
         console.error("Error fetching auctions:", err);
-        setError(err.message || "Failed to fetch auctions");
+        if (isMounted) {
+          setError(err.message || "Failed to fetch auctions");
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
     
     fetchAuctionDetails();
+
+    return () => {
+      isMounted = false;
+    };
   }, [activeAuctionIds, isLoadingIds, auctionContract]);
   
   return {
@@ -102,12 +119,13 @@ export function useAuctionDetails(auctionId: string) {
   const [error, setError] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<string>("");
   
-  const auctionContract = getContract({
+  // Memoize the contract instance
+  const auctionContract = useMemo(() => getContract({
     client,
     chain: CHAIN,
     address: CONTRACTS.AUCTION,
     abi: AUCTION_ABI,
-  });
+  }), []);
   
   // Get auction details
   const { data: auctionData, isLoading: isLoadingAuction } = useReadContract({
@@ -124,7 +142,8 @@ export function useAuctionDetails(auctionId: string) {
         ...auctionData,
       } as AuctionDetails);
       setIsLoading(false);
-    } else if (!isLoadingAuction) {
+      setError(null);
+    } else if (!isLoadingAuction && !auctionData) {
       // If no auction is found, set error and null auction
       setError("Auction not found");
       setAuction(null);
@@ -132,43 +151,45 @@ export function useAuctionDetails(auctionId: string) {
     }
   }, [auctionData, isLoadingAuction, auctionId]);
   
-  // Calculate time remaining
-  useEffect(() => {
+  // Calculate time remaining - memoize the update function
+  const updateTimeRemaining = useCallback(() => {
     if (!auction) return;
     
-    const updateTimeRemaining = () => {
-      const now = Math.floor(Date.now() / 1000);
-      const endTime = Number(auction.endTime);
-      const remaining = endTime - now;
-      
-      if (remaining <= 0) {
-        setTimeRemaining("Auction ended");
-        return;
-      }
-      
-      const days = Math.floor(remaining / 86400);
-      const hours = Math.floor((remaining % 86400) / 3600);
-      const minutes = Math.floor((remaining % 3600) / 60);
-      
-      if (days > 0) {
-        setTimeRemaining(`${days}d ${hours}h remaining`);
-      } else if (hours > 0) {
-        setTimeRemaining(`${hours}h ${minutes}m remaining`);
-      } else {
-        setTimeRemaining(`${minutes}m remaining`);
-      }
-    };
+    const now = Math.floor(Date.now() / 1000);
+    const endTime = Number(auction.endTime);
+    const remaining = endTime - now;
+    
+    if (remaining <= 0) {
+      setTimeRemaining("Auction ended");
+      return;
+    }
+    
+    const days = Math.floor(remaining / 86400);
+    const hours = Math.floor((remaining % 86400) / 3600);
+    const minutes = Math.floor((remaining % 3600) / 60);
+    
+    if (days > 0) {
+      setTimeRemaining(`${days}d ${hours}h remaining`);
+    } else if (hours > 0) {
+      setTimeRemaining(`${hours}h ${minutes}m remaining`);
+    } else {
+      setTimeRemaining(`${minutes}m remaining`);
+    }
+  }, [auction]);
+
+  useEffect(() => {
+    if (!auction) return;
     
     updateTimeRemaining();
     const interval = setInterval(updateTimeRemaining, 60000); // Update every minute
     
     return () => clearInterval(interval);
-  }, [auction]);
+  }, [auction, updateTimeRemaining]);
   
   const { mutate: sendTransaction } = useSendTransaction();
   
-  // Function to place bid
-  const placeBid = async (bidAmount: string) => {
+  // Function to place bid - memoized to prevent recreation
+  const placeBid = useCallback(async (bidAmount: string) => {
     if (!auction) {
       return { success: false, error: "Auction not found" };
     }
@@ -203,7 +224,7 @@ export function useAuctionDetails(auctionId: string) {
       console.error("Error placing bid:", err);
       return { success: false, error: err.message || "Failed to place bid" };
     }
-  };
+  }, [auction, auctionContract, auctionId, sendTransaction]);
   
   return {
     auction,

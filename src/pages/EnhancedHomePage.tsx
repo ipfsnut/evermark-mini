@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useActiveAccount } from "thirdweb/react";
 import { PlusIcon, BookOpenIcon, TrendingUpIcon, ExternalLinkIcon } from 'lucide-react';
@@ -17,14 +17,22 @@ const EnhancedHomePage: React.FC = () => {
   const { evermarks, isLoading } = useEvermarks();
   const { auctions } = useAuctions();
   
-  // Get voting stats
-  const votingContract = getContract({
+  // Memoize contract instances to prevent recreation on every render
+  const votingContract = useMemo(() => getContract({
     client,
     chain: CHAIN,
     address: CONTRACTS.VOTING,
     abi: VOTING_ABI,
-  });
+  }), []);
   
+  const catalogContract = useMemo(() => getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.CARD_CATALOG,
+    abi: CARD_CATALOG_ABI,
+  }), []);
+  
+  // Get voting stats
   const { data: currentCycle } = useReadContract({
     contract: votingContract,
     method: "getCurrentCycle",
@@ -32,27 +40,27 @@ const EnhancedHomePage: React.FC = () => {
   });
 
   // Get total voting power (active voters)
-  const catalogContract = getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.CARD_CATALOG,
-    abi: CARD_CATALOG_ABI,
-  });
-  
   const { data: totalSupply } = useReadContract({
     contract: catalogContract,
     method: "totalSupply",
     params: [],
   });
 
-  // Calculate current week dates for leaderboard
-  const today = new Date();
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay()); // Set to Sunday
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6); // Set to Saturday
-  
-  const weekDisplay = `${format(startOfWeek, 'MMM d')} - ${format(endOfWeek, 'MMM d')}`;
+  // Memoize date calculations to prevent recalculation on every render
+  const weekDisplay = useMemo(() => {
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay()); // Set to Sunday
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // Set to Saturday
+    
+    return `${format(startOfWeek, 'MMM d')} - ${format(endOfWeek, 'MMM d')}`;
+  }, []);
+
+  // Memoize recent evermarks to prevent recalculation
+  const recentEvermarks = useMemo(() => {
+    return evermarks.slice(0, 5);
+  }, [evermarks]);
 
   return (
     <PageContainer fullWidth>
@@ -149,7 +157,7 @@ const EnhancedHomePage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {evermarks.slice(0, 5).map(evermark => (
+              {recentEvermarks.map(evermark => (
                 <Link 
                   key={evermark.id} 
                   to={`/evermark/${evermark.id}`}

@@ -4,32 +4,24 @@
 @tailwind utilities;
 
 /* Base styles and custom properties */
-:root {
-  /* Color scheme */
-  --color-primary: 124, 58, 237; /* Purple-600 */
-  --color-primary-dark: 109, 40, 217; /* Purple-700 */
-  --color-primary-light: 139, 92, 246; /* Purple-500 */
-  --color-secondary: 249, 250, 251; /* Gray-50 */
-  --color-text: 17, 24, 39; /* Gray-900 */
-  --color-text-light: 107, 114, 128; /* Gray-500 */
-  --color-bg: 249, 250, 251; /* Gray-50 */
-  --color-card: 255, 255, 255; /* White */
-  --color-border: 229, 231, 235; /* Gray-200 */
-  
-  /* Font settings */
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  font-synthesis: none;
-  font-weight: 400;
-  line-height: 1.5;
-  text-rendering: optimizeLegibility;
-
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-/* Base HTML elements */
 @layer base {
+  :root {
+    /* Color scheme */
+    --color-primary: 124, 58, 237; /* Purple-600 */
+    --color-primary-dark: 109, 40, 217; /* Purple-700 */
+    --color-primary-light: 139, 92, 246; /* Purple-500 */
+    
+    /* Font settings */
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    font-synthesis: none;
+    font-weight: 400;
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+  }
+
   html {
     @apply text-gray-900 bg-gray-50;
     scroll-behavior: smooth;
@@ -56,12 +48,7 @@
   }
   
   a {
-    @apply text-purple-600 hover:text-purple-700;
-  }
-  
-  /* Add a serif font option for specific elements */
-  .font-serif {
-    font-family: Georgia, serif;
+    @apply text-purple-600 hover:text-purple-700 transition-colors;
   }
 }
 
@@ -92,66 +79,23 @@
   }
 }
 
-/* Custom utilities */
+/* Focus styles for accessibility */
 @layer utilities {
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2;
+  }
+  
   .text-balance {
     text-wrap: balance;
   }
   
-  .text-pretty {
-    text-wrap: pretty;
-  }
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.5s ease-in-out;
-}
-
-@keyframes slideIn {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.animate-slideIn {
-  animation: slideIn 0.5s ease-out;
-}
-
-/* Media query for dark mode (if we decide to support it) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-text: 255, 255, 255;
-    --color-text-light: 209, 213, 219; /* Gray-300 */
-    --color-bg: 31, 41, 55; /* Gray-800 */
-    --color-card: 55, 65, 81; /* Gray-700 */
-    --color-border: 75, 85, 99; /* Gray-600 */
+  .animate-fadeIn {
+    animation: fadeIn 0.5s ease-in-out;
   }
   
-  html.dark {
-    @apply bg-gray-800 text-white;
+  .animate-slideIn {
+    animation: slideIn 0.5s ease-out;
   }
-  
-  .dark body {
-    @apply bg-gray-800 text-white;
-  }
-  
-  .dark .card {
-    @apply bg-gray-700 border-gray-600;
-  }
-  
-  .dark a {
-    @apply text-purple-400 hover:text-purple-300;
-  }
-}
-
-/* Focus styles for accessibility */
-:focus-visible {
-  @apply outline-none ring-2 ring-purple-500 ring-offset-2;
 }
 
 /* Scrollbar styling */
@@ -165,9 +109,5 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-400 rounded-full;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-500;
+  @apply bg-gray-400 rounded-full hover:bg-gray-500;
 }

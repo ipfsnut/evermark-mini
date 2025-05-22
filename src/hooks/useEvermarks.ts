@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getContract, readContract } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
@@ -20,18 +20,21 @@ export function useEvermarks() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Memoize contract instance to prevent recreation
+  const contract = useMemo(() => getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.EVERMARK_NFT,
+    abi: EVERMARK_NFT_ABI,
+  }), []);
+
   useEffect(() => {
+    let isMounted = true; // Prevent state updates if component unmounts
+
     const fetchEvermarks = async () => {
       try {
         setIsLoading(true);
-        
-        // Get contract instance
-        const contract = getContract({
-          client,
-          chain: CHAIN,
-          address: CONTRACTS.EVERMARK_NFT,
-          abi: EVERMARK_NFT_ABI,
-        });
+        setError(null);
         
         // Get total supply
         const totalSupply = await readContract({
@@ -42,8 +45,10 @@ export function useEvermarks() {
         
         // If no tokens have been minted yet
         if (Number(totalSupply) === 0) {
-          setEvermarks([]);
-          setIsLoading(false);
+          if (isMounted) {
+            setEvermarks([]);
+            setIsLoading(false);
+          }
           return;
         }
         
@@ -53,6 +58,8 @@ export function useEvermarks() {
         const endId = Math.max(1, startId - 10); // Get up to 10 most recent tokens
         
         for (let i = startId; i >= endId; i--) {
+          if (!isMounted) break; // Exit early if component unmounted
+          
           try {
             // Check if token exists
             const exists = await readContract({
@@ -100,17 +107,28 @@ export function useEvermarks() {
           }
         }
         
-        setEvermarks(fetchedEvermarks);
+        if (isMounted) {
+          setEvermarks(fetchedEvermarks);
+        }
       } catch (err: any) {
         console.error("Error fetching evermarks:", err);
-        setError(err.message || "Failed to load evermarks");
+        if (isMounted) {
+          setError(err.message || "Failed to load evermarks");
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
     
     fetchEvermarks();
-  }, []);
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, [contract]); // Only depend on the memoized contract
 
   return { evermarks, isLoading, error };
 }
@@ -120,37 +138,48 @@ export function useEvermarkDetail(id: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Memoize contract instance
+  const contract = useMemo(() => getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.EVERMARK_NFT,
+    abi: EVERMARK_NFT_ABI,
+  }), []);
+
   useEffect(() => {
+    let isMounted = true;
+
     const fetchEvermarkDetail = async () => {
       if (!id) {
-        setError("Invalid Evermark ID");
-        setIsLoading(false);
+        if (isMounted) {
+          setError("Invalid Evermark ID");
+          setIsLoading(false);
+        }
         return;
       }
 
       // Handle the "new" ID placeholder case
       if (id === "new") {
-        setError("Your Evermark is being created. Please check your collection once the transaction is confirmed.");
-        setIsLoading(false);
+        if (isMounted) {
+          setError("Your Evermark is being created. Please check your collection once the transaction is confirmed.");
+          setIsLoading(false);
+        }
         return;
       }
 
       try {
         setIsLoading(true);
-        const contract = getContract({
-          client,
-          chain: CHAIN,
-          address: CONTRACTS.EVERMARK_NFT,
-          abi: EVERMARK_NFT_ABI,
-        });
+        setError(null);
 
         // Safely convert id to BigInt
         let tokenId;
         try {
           tokenId = BigInt(id);
         } catch (e) {
-          setError(`Invalid Evermark ID format: ${id}`);
-          setIsLoading(false);
+          if (isMounted) {
+            setError(`Invalid Evermark ID format: ${id}`);
+            setIsLoading(false);
+          }
           return;
         }
 
@@ -162,8 +191,10 @@ export function useEvermarkDetail(id: string) {
         });
 
         if (!exists) {
-          setError("Evermark not found");
-          setIsLoading(false);
+          if (isMounted) {
+            setError("Evermark not found");
+            setIsLoading(false);
+          }
           return;
         }
 
@@ -208,26 +239,36 @@ export function useEvermarkDetail(id: string) {
           }
         }
 
-        setEvermark({
-          id,
-          title,
-          author,
-          description,
-          sourceUrl,
-          metadataURI,
-          creator,
-          creationTime: Number(creationTime) * 1000,
-        });
+        if (isMounted) {
+          setEvermark({
+            id,
+            title,
+            author,
+            description,
+            sourceUrl,
+            metadataURI,
+            creator,
+            creationTime: Number(creationTime) * 1000,
+          });
+        }
       } catch (err: any) {
         console.error("Error fetching Evermark:", err);
-        setError(err.message || "Failed to load Evermark details");
+        if (isMounted) {
+          setError(err.message || "Failed to load Evermark details");
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchEvermarkDetail();
-  }, [id]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, contract]); // Dependencies: id and memoized contract
 
   return { evermark, isLoading, error };
 }
@@ -237,22 +278,29 @@ export function useUserEvermarks(userAddress?: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Memoize contract instance
+  const contract = useMemo(() => getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.EVERMARK_NFT,
+    abi: EVERMARK_NFT_ABI,
+  }), []);
+
   useEffect(() => {
+    let isMounted = true;
+
     const fetchUserEvermarks = async () => {
       if (!userAddress) {
-        setEvermarks([]);
-        setIsLoading(false);
+        if (isMounted) {
+          setEvermarks([]);
+          setIsLoading(false);
+        }
         return;
       }
 
       try {
         setIsLoading(true);
-        const contract = getContract({
-          client,
-          chain: CHAIN,
-          address: CONTRACTS.EVERMARK_NFT,
-          abi: EVERMARK_NFT_ABI,
-        });
+        setError(null);
 
         // Get balance of user
         const balance = await readContract({
@@ -262,8 +310,10 @@ export function useUserEvermarks(userAddress?: string) {
         });
 
         if (Number(balance) === 0) {
-          setEvermarks([]);
-          setIsLoading(false);
+          if (isMounted) {
+            setEvermarks([]);
+            setIsLoading(false);
+          }
           return;
         }
 
@@ -276,9 +326,8 @@ export function useUserEvermarks(userAddress?: string) {
 
         const userEvermarks: Evermark[] = [];
 
-        // IMPORTANT: Modified approach to handle user's tokens efficiently
         // Loop through all token IDs and check ownership
-        for (let i = 1; i <= Number(totalSupply); i++) {
+        for (let i = 1; i <= Number(totalSupply) && isMounted; i++) {
           try {
             // Check if token exists
             const exists = await readContract({
@@ -299,8 +348,6 @@ export function useUserEvermarks(userAddress?: string) {
 
               // Skip if not owned by user
               if (owner.toLowerCase() !== userAddress.toLowerCase()) continue;
-
-              console.log(`Found token ${i} owned by user`);
 
               // Get metadata
               const [title, author, metadataURI] = await readContract({
@@ -346,17 +393,27 @@ export function useUserEvermarks(userAddress?: string) {
           }
         }
 
-        setEvermarks(userEvermarks);
+        if (isMounted) {
+          setEvermarks(userEvermarks);
+        }
       } catch (err: any) {
         console.error("Error fetching user evermarks:", err);
-        setError(err.message || "Failed to load your Evermarks");
+        if (isMounted) {
+          setError(err.message || "Failed to load your Evermarks");
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchUserEvermarks();
-  }, [userAddress]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userAddress, contract]); // Dependencies: userAddress and memoized contract
 
   return { evermarks, isLoading, error };
 }
