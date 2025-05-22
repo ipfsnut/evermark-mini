@@ -5,8 +5,8 @@
   # Directory to publish (Vite builds to 'dist')
   publish = "dist"
   
-  # Node version
-  environment = { NODE_VERSION = "18" }
+  # Node version - updated to 20 for React Router 7.6.0 compatibility
+  environment = { NODE_VERSION = "20" }
 
 # SPA redirect for client-side routing
 [[redirects]]
