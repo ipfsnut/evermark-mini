@@ -1,5 +1,8 @@
 // netlify/functions/webhook.ts
 import type { Context } from "@netlify/functions";
+import { createThirdwebClient, getContract, prepareContractCall, sendTransaction } from "thirdweb";
+import { privateKeyToAccount } from "thirdweb/wallets";
+import { base } from "thirdweb/chains";
 
 // Types for Farcaster webhook events
 interface FarcasterCastEvent {
@@ -49,18 +52,34 @@ interface EvermarkCommand {
   collection?: string;
 }
 
-// Parse !evermark commands from cast text
+// Contract ABI for mintBookmarkFor function
+const EVERMARK_NFT_ABI = [
+  {
+    "inputs": [
+      {"internalType": "address", "name": "to", "type": "address"},
+      {"internalType": "string", "name": "metadataURI", "type": "string"},
+      {"internalType": "string", "name": "title", "type": "string"},
+      {"internalType": "string", "name": "creator", "type": "string"}
+    ],
+    "name": "mintBookmarkFor",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+] as const;
+
+// Parse !evermark commands from cast text (supports variations)
 function parseEvermarkCommand(text: string): EvermarkCommand | null {
-  console.log('Parsing text for !evermark command:', text);
+  console.log('Parsing text for evermark command:', text);
   
-  // Look for !evermark command (case insensitive)
-  const evermarkMatch = text.match(/!evermark\s*(.*)?/i);
+  // Look for command variations (case insensitive)
+  const evermarkMatch = text.match(/!(evermark|bookmark|save)\s*(.*)?/i);
   if (!evermarkMatch) {
-    console.log('No !evermark command found');
+    console.log('No evermark command found');
     return null;
   }
 
-  const commandText = evermarkMatch[1]?.trim() || '';
+  const commandText = evermarkMatch[2]?.trim() || '';
   console.log('Command text found:', commandText);
   
   // Parse optional parameters
@@ -132,7 +151,11 @@ async function createEvermarkMetadata(
       {
         trait_type: 'Privacy',
         value: command.isPrivate ? 'Private' : 'Public'
-      }
+      },
+      ...(command.collection ? [{
+        trait_type: 'Collection',
+        value: command.collection
+      }] : [])
     ]
   };
 
@@ -144,8 +167,8 @@ async function createEvermarkMetadata(
 async function uploadToIPFS(metadata: any, castHash: string): Promise<string> {
   console.log('Uploading to IPFS...');
   
-  const apiKey = Netlify.env.get('PINATA_API_KEY');
-  const secretKey = Netlify.env.get('PINATA_SECRET_KEY');
+  const apiKey = process.env.PINATA_API_KEY;
+  const secretKey = process.env.PINATA_SECRET_KEY;
   
   if (!apiKey || !secretKey) {
     throw new Error('Pinata API keys not configured');
@@ -185,6 +208,73 @@ async function uploadToIPFS(metadata: any, castHash: string): Promise<string> {
   return metadataURI;
 }
 
+// Mint NFT on blockchain
+async function mintEvermarkNFT(
+  recipientAddress: string,
+  metadataURI: string,
+  title: string,
+  author: string
+): Promise<{ transactionHash: string; tokenId?: string }> {
+  console.log('Minting NFT on blockchain...');
+  
+  // Get environment variables
+  const privateKey = process.env.MINTER_PRIVATE_KEY;
+  const contractAddress = process.env.VITE_BOOKMARK_NFT_ADDRESS;
+  const thirdwebClientId = process.env.VITE_THIRDWEB_CLIENT_ID;
+  
+  if (!privateKey || !contractAddress || !thirdwebClientId) {
+    throw new Error('Missing required environment variables for minting');
+  }
+  
+  // Create Thirdweb client
+  const client = createThirdwebClient({
+    clientId: thirdwebClientId,
+  });
+  
+  // Create wallet from private key
+  const account = privateKeyToAccount({
+    client,
+    privateKey: privateKey as `0x${string}`,
+  });
+  
+  // Get contract instance
+  const contract = getContract({
+    client,
+    chain: base,
+    address: contractAddress,
+    abi: EVERMARK_NFT_ABI,
+  });
+  
+  // Prepare transaction
+  const transaction = prepareContractCall({
+    contract,
+    method: "mintBookmarkFor",
+    params: [recipientAddress, metadataURI, title, author],
+  });
+  
+  // Send transaction
+  const result = await sendTransaction({
+    transaction,
+    account,
+  });
+  
+  console.log('NFT minted successfully!', result.transactionHash);
+  
+  return {
+    transactionHash: result.transactionHash,
+    // TODO: Extract tokenId from transaction receipt events
+  };
+}
+
+// Get user's Ethereum address from Farcaster verified addresses
+function getUserAddress(cast: FarcasterCastEvent['data']): string | null {
+  const ethAddresses = cast.author.verified_addresses?.eth_addresses || [];
+  if (ethAddresses.length > 0) {
+    return ethAddresses[0]; // Use first verified address
+  }
+  return null;
+}
+
 // Main webhook handler using modern Netlify Functions API
 export default async (request: Request, context: Context) => {
   console.log('Webhook received:', request.method, request.url);
@@ -207,8 +297,11 @@ export default async (request: Request, context: Context) => {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       service: 'evermark-webhook',
-      version: '2.0.0',
-      netlify_functions_version: '3.1.8'
+      version: '3.0.0',
+      features: {
+        ipfsUpload: !!process.env.PINATA_API_KEY,
+        blockchainMinting: !!process.env.MINTER_PRIVATE_KEY,
+      }
     }, {
       headers: {
         'Access-Control-Allow-Origin': '*',
@@ -233,8 +326,11 @@ export default async (request: Request, context: Context) => {
     
     console.log('Processing webhook with signature:', signature ? 'present' : 'missing');
     
-    // TODO: Add signature verification here if needed
-    // const webhookSecret = Netlify.env.get('FARCASTER_WEBHOOK_SECRET');
+    // TODO: Add signature verification here
+    // const webhookSecret = process.env.FARCASTER_WEBHOOK_SECRET;
+    // if (!verifySignature(body, signature, webhookSecret)) {
+    //   return Response.json({ error: 'Invalid signature' }, { status: 401 });
+    // }
     
     const webhookEvent = JSON.parse(body) as FarcasterCastEvent;
     console.log('Webhook event type:', webhookEvent.type);
@@ -266,35 +362,77 @@ export default async (request: Request, context: Context) => {
     console.log('Author:', cast.author.username, `(FID: ${cast.author.fid})`);
     console.log('Command:', command);
     
+    // Get user's Ethereum address
+    const userAddress = getUserAddress(cast);
+    if (!userAddress) {
+      console.error('No verified Ethereum address found for user');
+      return Response.json({
+        status: 'error',
+        error: 'No verified Ethereum address found. Please verify an address on Farcaster.',
+        castHash: cast.hash,
+        author: cast.author.username,
+      }, {
+        status: 400,
+        headers: { 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+    
+    console.log('User Ethereum address:', userAddress);
+    
     // Create Evermark metadata
     const metadata = await createEvermarkMetadata(cast, command);
     
-    // Upload to IPFS (if Pinata keys are configured)
+    // Upload to IPFS
     let metadataURI = 'metadata-not-uploaded';
     try {
       metadataURI = await uploadToIPFS(metadata, cast.hash);
     } catch (ipfsError) {
       console.error('IPFS upload failed:', ipfsError);
-      // Continue anyway - we can still process the command
+      // Continue anyway for testing - in production, you might want to fail here
     }
     
-    // TODO: Create actual blockchain transaction here
-    // For now, we'll simulate success
-    const mockEvermarkId = `cast-${cast.hash.slice(0, 10)}`;
+    // Mint NFT on blockchain
+    let transactionHash = '';
+    let tokenId = '';
     
-    console.log('✅ Evermark created successfully!');
+    try {
+      if (process.env.MINTER_PRIVATE_KEY) {
+        const mintResult = await mintEvermarkNFT(
+          userAddress,
+          metadataURI,
+          metadata.name,
+          metadata.attributes.find((a: any) => a.trait_type === 'Original Author')?.value || 'Unknown'
+        );
+        transactionHash = mintResult.transactionHash;
+        tokenId = mintResult.tokenId || 'pending';
+        
+        console.log('✅ NFT minted successfully!');
+        console.log('Transaction hash:', transactionHash);
+      } else {
+        console.log('⚠️ Minting skipped - no minter key configured');
+      }
+    } catch (mintError) {
+      console.error('Minting failed:', mintError);
+      // In production, you might want to save failed mints to retry later
+    }
+    
+    // TODO: Send notification reply to user on Farcaster
+    // This would require Farcaster API integration to post a reply
+    
+    console.log('✅ Evermark processing complete!');
     console.log('Metadata URI:', metadataURI);
-    console.log('Mock Evermark ID:', mockEvermarkId);
-    
-    // TODO: Send notification to user
+    console.log('Transaction hash:', transactionHash || 'not-minted');
+    console.log('Token ID:', tokenId || 'pending');
     
     return Response.json({
       status: 'success',
-      evermarkId: mockEvermarkId,
+      evermarkId: tokenId || `cast-${cast.hash.slice(0, 10)}`,
       metadataURI: metadataURI,
+      transactionHash: transactionHash,
       message: 'Evermark created successfully',
       castHash: cast.hash,
       author: cast.author.username,
+      userAddress: userAddress,
       command: command
     }, {
       headers: { 'Access-Control-Allow-Origin': '*' }

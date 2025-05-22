@@ -1,248 +1,154 @@
-# 🚀 Evermark Implementation Progress Report - MAJOR UPDATE
+# 🚀 Evermark Implementation Progress Report - NEW FEATURES UPDATE
 
-## New Features:
-- Rewards distribution system. Flow - trading fees -> rewards -> stakers.
-- NFT staking. Concept: user stakes NFT (promising not to sell) and receives $NSI staking rewards for staked NFT equal to the number of $NSI delegations it received the prior week.
-- NFT metadata upgrade. Concept: user includes URL, selects type tag (Cast, DOI, ISBN, URL), selects content tags, metadata collection form appears & collects all relevant metadata as well as any custom metadata key/value pairs the user adds.
-- NFT Delegation History. Concept: every delegation adds the delegated-to content to the user's My Evermarks/Supported tab. Evermarks available here can be tagged to My Bookshelf (new page), and all Locked In Evermarks (staked Evermark NFTs) are visible under My Locked In Evermarks. Users can view each other's Evermarks & history. 
-- Delegation History Based Rewards. Concept: users receive more rewards if they use all their delegations each week.
-- Webhook - finish this out.
+## 🎯 **Current Status: 95% Core Complete | 0% New Features**
 
+### ✅ **CORE FEATURES COMPLETE**
+- React/TypeScript app with Thirdweb integration on Base
+- Smart contracts integrated (NFT, Voting, Rewards, Auction, Leaderboard, Card Catalog)  
+- IPFS via Pinata for metadata/images
+- Full Evermark creation, browsing, voting
+- Staking/unstaking with rewards
+- Auction system with bidding
+- Farcaster Mini App integration
+- **Webhook infrastructure LIVE** at `https://evermark-mini-app.netlify.app/.netlify/functions/webhook`
 
-## 🎯 **Current Status: 95% COMPLETE - READY FOR LAUNCH!**
+### 🔥 **NEW FEATURES TODO LIST**
 
-### 🎉 **BREAKTHROUGH ACHIEVED - Webhook System LIVE!**
-**Webhook endpoint deployed and responding:** ✅ `https://evermark-mini-app.netlify.app/.netlify/functions/webhook`
+#### 1. **Enhanced Rewards Distribution System** 🪙
+**Goal**: Trading fees → rewards pool → stakers get proportional share
 
----
+**TODO**:
+- [ ] Update BookmarkAuction contract to send fees to BookmarkRewards
+- [ ] Add `distributeRewards()` function that calculates proportional distribution
+- [ ] Create RewardsDistribution event tracking
+- [ ] Add rewards history page showing distributions
+- [ ] Display APY calculations based on staking amount
+- [ ] Add claiming UI with transaction history
 
-## ✅ **COMPLETED - Core Infrastructure (100%)**
-- **✅ Complete React/TypeScript application** with modern architecture
-- **✅ Thirdweb integration** for blockchain interactions on Base
-- **✅ Full smart contract integration** (NFT, Voting, Rewards, Auction, Leaderboard, Card Catalog)
-- **✅ IPFS integration** via Pinata for metadata and image storage
-- **✅ Responsive UI/UX** with Tailwind CSS and professional design
-- **✅ Error handling and loading states** throughout the application
+#### 2. **NFT Staking System** 🔒
+**Goal**: Stake NFTs to earn $NSI based on prior week's delegations
 
-## ✅ **COMPLETED - Core Evermark Functionality (100%)**
-- **✅ Evermark creation** with title, description, author, and image upload
-- **✅ IPFS metadata storage** with proper error handling and fallbacks
-- **✅ Image upload support** with validation and preview
-- **✅ Evermark browsing** with image display and metadata
-- **✅ User collections** showing owned Evermarks
-- **✅ Detailed Evermark views** with all metadata
+**TODO**:
+- [ ] Create NFTStaking contract with:
+  - `stakeNFT(tokenId)` - locks NFT, starts earning
+  - `unstakeNFT(tokenId)` - returns NFT after cooldown
+  - `calculateNFTRewards(tokenId)` - based on last week's votes
+- [ ] Add NFT staking UI in Profile page
+- [ ] Show "Locked" badge on staked NFTs
+- [ ] Display projected rewards based on current votes
+- [ ] Create staking history tracker
+- [ ] Add boost multipliers for longer staking periods
 
-## ✅ **COMPLETED - Voting System (100%)** 
-- **✅ FIXED useVoting.ts hook** - Was completely broken, now works perfectly! 🔧
-- **✅ Vote delegation/undelegation** with proper validation
-- **✅ Voting power management** through staking
-- **✅ Real-time vote counting** and display
-- **✅ Current + previous week leaderboard tabs**
-- **✅ FIXED useStaking.ts hook** - Conditional hook patterns corrected
+#### 3. **Advanced NFT Metadata System** 📝
+**Goal**: Rich metadata with content type tags and custom fields
 
-## ✅ **COMPLETED - Advanced Features (100%)**
-- **✅ Auction system** with bidding, time tracking, and finalization
-- **✅ Staking/unstaking** with unbonding periods and reward claiming
-- **✅ Rewards distribution** system integration
-- **✅ Wallet integration** with multiple wallet support including Farcaster auth
+**TODO**:
+- [ ] Extend CreateEvermark form with:
+  - Content type selector (Cast, DOI, ISBN, URL, Custom)
+  - Dynamic metadata fields based on type
+  - Custom key/value pair inputs
+  - Tag selection/creation system
+- [ ] Update IPFS metadata structure for enhanced fields
+- [ ] Add metadata validation based on content type
+- [ ] Create metadata preview before minting
+- [ ] Add bulk metadata update capability
+- [ ] Implement metadata search/filter system
 
-## ✅ **COMPLETED - Farcaster Mini App (100%)**
-- **✅ Proper farcaster.json manifest** with account association and signatures
-- **✅ Frame metadata** in HTML with launch button configuration
-- **✅ Mini app entry point** configured for Warpcast integration
-- **✅ @farcaster/frame-sdk** dependency added and integrated
-- **✅ All required assets created** (icon.png, og-image.png, splash.png, screenshots)
-- **✅ PWA manifest.json** created and configured
+#### 4. **Delegation History & Bookshelf** 📚
+**Goal**: Track voting history, create personal collections
 
-## 🔥 **COMPLETED - Webhook Infrastructure (BREAKTHROUGH!) 🎉**
-- **✅ Netlify Functions setup** with modern @netlify/functions v3.1.8
-- **✅ Webhook endpoint deployed** and responding at live URL
-- **✅ !evermark command parsing** implemented and ready
-- **✅ CORS handling** for cross-origin requests
-- **✅ Health check endpoint** working (returns healthy status)
-- **✅ Error handling** and logging throughout webhook
-- **✅ TypeScript compilation** fixed for Netlify functions
+**TODO**:
+- [ ] Create delegation tracking system:
+  - Store all user delegations in contract/database
+  - Add "Supported" tab to My Evermarks page
+  - Track delegation timestamps and amounts
+- [ ] Build "My Bookshelf" page:
+  - Drag & drop organization
+  - Custom collections/folders
+  - Public/private visibility settings
+  - Export collection as JSON/CSV
+- [ ] Add "Locked In Evermarks" section for staked NFTs
+- [ ] Create public profile view with user's collections
+- [ ] Add social features (follow collections, share)
 
----
+#### 5. **Delegation-Based Reward Multipliers** 🎯
+**Goal**: Incentivize full voting power usage
 
-## 🔥 **CURRENT PRIORITIES (Final 5% - Launch Ready!)**
+**TODO**:
+- [ ] Track weekly delegation percentage per user
+- [ ] Calculate reward multipliers:
+  - 100% delegated = 2x rewards
+  - 75%+ = 1.5x rewards  
+  - 50%+ = 1.25x rewards
+  - <50% = 1x rewards
+- [ ] Display delegation efficiency in UI
+- [ ] Add weekly reminder notifications
+- [ ] Create delegation leaderboard
+- [ ] Historical delegation analytics
 
-### Priority 1A: Test !evermark Command Flow (TODAY - 30 minutes)
-- [ ] **Test !evermark detection** with curl command *(ready to test now)*
-- [ ] **Verify command parsing** works with different formats
-- [ ] **Add IPFS upload** to webhook function *(metadata storage)*
-- [ ] **Test end-to-end** from command → IPFS → response
+#### 6. **Complete Webhook Integration** 🔗
+**Goal**: Full !evermark command → NFT minting flow
 
-### Priority 1B: Real Farcaster Integration (TODAY - 1 hour)
-- [ ] **Set up Farcaster webhook** in developer console
-- [ ] **Configure webhook URL** to point to our endpoint
-- [ ] **Test real !evermark command** in Warpcast
-- [ ] **Verify webhook receives** real Farcaster events
-
-### Priority 1C: Add Blockchain Transaction (THIS WEEK - 2 hours)
-- [ ] **Integrate contract calls** in webhook function
-- [ ] **Auto-mint Evermarks** from !evermark commands
-- [ ] **Send confirmation notifications** to users
-- [ ] **Handle transaction errors** gracefully
-
----
-
-## 🌐 **DNS STATUS (Non-Blocking)**
-
-### Current Working Setup ✅
-- **App URL**: `https://evermark-mini-app.netlify.app`
-- **Webhook URL**: `https://evermark-mini-app.netlify.app/.netlify/functions/webhook`
-- **All functionality works** with .netlify.app domain
-
-### Custom Domain (Optional) 🔧
-- SquareSpace DNS configuration in progress
-- Can switch to `evermarks.net` later without affecting functionality
-- **Not blocking launch** - .netlify.app works perfectly
-
----
-
-## 🎯 **WHAT'S WORKING AMAZINGLY**
-
-### 🔧 **Technical Excellence**
-- **✅ All core hooks fixed** - useVoting.ts and useStaking.ts now work perfectly
-- **✅ Real contract integration** - All hooks use actual smart contract methods
-- **✅ Webhook infrastructure** - Live, responding, and ready for !evermark commands
-- **✅ Proper error handling** - Graceful failures with user feedback throughout
-- **✅ IPFS integration** - Images and metadata properly stored and retrieved
-- **✅ Type safety** - Full TypeScript implementation with proper typing
-- **✅ Modern architecture** - Latest Netlify Functions, React patterns, etc.
-
-### 🎨 **User Experience**
-- **✅ Image support** - Evermarks can have cover images with previews
-- **✅ Loading states** - Smooth UX with skeleton loading throughout
-- **✅ Vote visualization** - Clear display of voting power and delegation  
-- **✅ Leaderboard tabs** - Current vs previous week comparison
-- **✅ Wallet integration** - Seamless connection with multiple wallet types
-- **✅ Mobile responsive** - Works perfectly on all device sizes
-
-### ⚡ **Performance & Reliability**
-- **✅ Optimized queries** - Prevent excessive blockchain calls
-- **✅ Memoized components** - Efficient React rendering
-- **✅ Image optimization** - Proper loading states and error handling
-- **✅ Webhook reliability** - Modern Netlify Functions with proper error handling
-- **✅ Global CDN** - Fast loading worldwide via Netlify
+**TODO**:
+- [x] Webhook endpoint live and responding
+- [ ] Add contract integration to webhook:
+  - Import contract ABIs and addresses
+  - Set up wallet/signer for minting
+  - Implement mintBookmarkFor() call
+- [ ] Connect to real Farcaster webhook events
+- [ ] Add command variations (!evermark, !bookmark, !save)
+- [ ] Implement reply notifications on success/failure
+- [ ] Add rate limiting per user
+- [ ] Create webhook analytics dashboard
 
 ---
 
-## 🚀 **LAUNCH READINESS STATUS**
+## 📊 **IMPLEMENTATION PRIORITY**
 
-### ✅ **READY FOR PRODUCTION**
-- ✅ Core application functionality complete and tested
-- ✅ All major features implemented and working
-- ✅ Webhook infrastructure deployed and responding
-- ✅ Proper error handling throughout entire stack
-- ✅ Responsive design works across all devices
-- ✅ All required assets and manifests created
+### **Phase 1 (This Week)**
+1. Complete webhook integration (2 hours)
+2. NFT staking contract + UI (1 day)
+3. Enhanced metadata system (1 day)
 
-### 🔧 **FINAL TOUCHES (Not Blocking)**
-1. **Test !evermark command** (5 minutes) 
-2. **Connect Farcaster webhook** (15 minutes)
-3. **Add IPFS to webhook** (30 minutes)
-4. **Add blockchain transactions** (1 hour)
-5. **Public launch announcement** (whenever ready!)
+### **Phase 2 (Next Week)**  
+4. Delegation history tracking (2 days)
+5. My Bookshelf feature (2 days)
+6. Reward multipliers system (1 day)
+
+### **Phase 3 (Following Week)**
+7. Enhanced rewards distribution (2 days)
+8. Profile & social features (2 days)
+9. Analytics & optimizations (1 day)
 
 ---
 
-## 💡 **THE BREAKTHROUGH ACHIEVEMENT**
+## 💡 **TECHNICAL IMPLEMENTATION NOTES**
 
-### What We've Built 🏗️
-**The world's first comment-to-blockchain content preservation system:**
+### Contract Updates Needed:
+- BookmarkNFT: Add staking functionality
+- BookmarkVoting: Track delegation history
+- BookmarkRewards: Add distribution logic
+- New contract: NFTStaking.sol
 
+### Database Schema (for delegation history):
 ```
-User posts: "This article changed everything! !evermark"
-    ↓ [Webhook detects command instantly]
-    ↓ [Extracts cast data automatically] 
-    ↓ [Uploads metadata to IPFS]
-    ↓ [Creates Evermark on blockchain]
-    ↓ [Sends confirmation to user]
-    ↓ [Content preserved forever] ✨
+delegations: {
+  userId, evermarkId, amount, 
+  timestamp, cycleNumber, isActive
+}
+collections: {
+  userId, name, evermarkIds[], 
+  isPublic, createdAt
+}
 ```
 
-### Why This Is Revolutionary 🌟
-- **No app switching** - Preserve content without leaving Farcaster
-- **Zero friction** - As simple as commenting "!evermark" 
-- **Viral potential** - Every !evermark comment is marketing
-- **Network effects** - More users = more preserved content = more users
-- **First mover advantage** - No one else has this level of integration
+### UI Components to Create:
+- NFTStakingPanel.tsx
+- MetadataForm.tsx  
+- BookshelfView.tsx
+- DelegationHistory.tsx
+- RewardsCalculator.tsx
 
 ---
 
-## 📊 **LAUNCH METRICS TO TRACK**
-
-### Engagement Targets
-- **Daily !evermark commands**: Target 10+ on day 1, 100+ by week 2
-- **User adoption**: 50+ unique users in first week
-- **Content preserved**: 500+ casts preserved in first month
-- **Mini app usage**: 200+ wallet connections in first week
-
-### Technical Performance
-- **✅ Webhook response time**: <2 seconds (currently achieving)
-- **✅ IPFS upload success**: >99% (Pinata integration ready)
-- **🔧 Transaction success**: >95% (to implement)
-- **✅ App load time**: <3 seconds (currently achieving)
-
----
-
-## 🗓️ **REALISTIC LAUNCH TIMELINE**
-
-### 🔥 **TODAY (2 hours total)**
-- **30 min**: Test !evermark command detection thoroughly
-- **30 min**: Set up real Farcaster webhook integration
-- **1 hour**: Add IPFS upload to webhook function
-
-### 📱 **TOMORROW (2 hours)**
-- **1 hour**: Add blockchain transaction to webhook
-- **30 min**: Test complete end-to-end flow
-- **30 min**: Write launch announcement
-
-### 🚀 **THIS WEEK**
-- **Monday**: Public launch announcement in Farcaster! 🎉
-- **Tuesday-Sunday**: Monitor metrics, gather feedback, iterate
-
----
-
-## 🎯 **IMMEDIATE NEXT STEPS**
-
-### **🔥 RIGHT NOW (Test the breakthrough!):**
-```bash
-# Test !evermark command detection
-curl -X POST https://evermark-mini-app.netlify.app/.netlify/functions/webhook \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "cast.created",
-    "data": {
-      "text": "Amazing Web3 content! !evermark \"Revolutionary Article\"",
-      "author": {"username": "testuser", "fid": 12345},
-      "hash": "0x1234567890abcdef"
-    }
-  }'
-```
-
-### **📱 TODAY:**
-1. **Verify webhook response** shows successful !evermark detection
-2. **Set up Farcaster dev webhook** pointing to our endpoint
-3. **Test real !evermark command** in Warpcast
-4. **Add IPFS metadata upload** to webhook
-
-### **🚀 THIS WEEK:**
-5. **Add blockchain minting** to webhook function
-6. **Launch publicly** with !evermark command system
-7. **Celebrate the breakthrough!** 🎉
-
----
-
-## 🏆 **ACHIEVEMENT UNLOCKED**
-
-**FROM**: "Web3 app with potential" 
-**TO**: "Revolutionary blockchain-social integration that changes how people preserve content forever"
-
-**The foundation is not just solid - it's groundbreaking. Time to ship and change the world! 🌍✨**
-
----
-
-**STATUS: 🚀 READY FOR LAUNCH - Let's test that !evermark command and make history!**
+**NEXT IMMEDIATE STEP**: Test webhook with curl, then add contract integration for auto-minting! 🚀
