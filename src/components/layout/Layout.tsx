@@ -1,115 +1,70 @@
-// src/components/layout/Layout.tsx
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { useActiveAccount } from "thirdweb/react";
-import { WalletConnect } from '../ConnectButton';
-import { 
-  HomeIcon, 
-  PlusIcon, 
-  BookmarkIcon, 
-  UserIcon, 
-  TrophyIcon,
-  DollarSignIcon 
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import Header from './Header';
+import Sidebar from './Sidebar';
+import Footer from './Footer';
+import { useLocation } from 'react-router-dom';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-export function Layout({ children }: LayoutProps) {
-  const account = useActiveAccount();
-  const isConnected = !!account;
-
+const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const location = useLocation();
+  
+  // Handle sidebar state on resize and route changes
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Set initial state
+    
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Close sidebar on mobile when route changes
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  }, [location.pathname]);
+  
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">E</span>
-              </div>
-              <span className="text-xl font-serif font-bold">Evermark</span>
-            </Link>
-
-            {/* Navigation */}
-            <nav className="hidden md:flex items-center space-x-6">
-              <Link 
-                to="/" 
-                className="flex items-center space-x-1 text-gray-700 hover:text-purple-600 transition-colors"
-              >
-                <HomeIcon className="w-4 h-4" />
-                <span>Home</span>
-              </Link>
-              
-              <Link 
-                to="/leaderboard"
-                className="flex items-center space-x-1 text-gray-700 hover:text-purple-600 transition-colors"
-              >
-                <TrophyIcon className="w-4 h-4" />
-                <span>Leaderboard</span>
-              </Link>
-              
-              <Link 
-                to="/auctions"
-                className="flex items-center space-x-1 text-gray-700 hover:text-purple-600 transition-colors"
-              >
-                <DollarSignIcon className="w-4 h-4" />
-                <span>Auctions</span>
-              </Link>
-
-              {isConnected && (
-                <>
-                  <Link 
-                    to="/create"
-                    className="flex items-center space-x-1 text-gray-700 hover:text-purple-600 transition-colors"
-                  >
-                    <PlusIcon className="w-4 h-4" />
-                    <span>Create</span>
-                  </Link>
-                  
-                  <Link 
-                    to="/my-evermarks"
-                    className="flex items-center space-x-1 text-gray-700 hover:text-purple-600 transition-colors"
-                  >
-                    <BookmarkIcon className="w-4 h-4" />
-                    <span>My Collection</span>
-                  </Link>
-                  
-                  <Link 
-                    to="/profile"
-                    className="flex items-center space-x-1 text-gray-700 hover:text-purple-600 transition-colors"
-                  >
-                    <UserIcon className="w-4 h-4" />
-                    <span>Profile</span>
-                  </Link>
-                </>
-              )}
-            </nav>
-
-            {/* Wallet Connection */}
-            <div className="flex items-center">
-              <WalletConnect />
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      <div className="flex flex-1">
+        {/* Sidebar */}
+        <Sidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
+        
+        {/* Main Content */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Header openSidebar={() => setSidebarOpen(true)} />
+          
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+            <div className="w-full mx-auto">
+              {children}
             </div>
-          </div>
+          </main>
+          
+          {/* Global Footer - replaces individual page footers */}
+          <Footer />
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-gray-500 text-sm">
-            <p>&copy; 2024 Evermark. Built on Base.</p>
-          </div>
-        </div>
-      </footer>
+      </div>
+      
+      {/* Overlay for mobile sidebar */}
+      {sidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-10"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
     </div>
   );
-}
+};
+
+export default Layout;

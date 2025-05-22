@@ -43,19 +43,25 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
     params: [BigInt(evermarkId)],
   });
   
-  // REAL: Using actual method name "getUserVotesForBookmark"
-  const { data: userVotes, isLoading: isLoadingUserVotes } = useReadContract({
+  // For reading user votes
+  const userVotesQuery = account ? useReadContract({
     contract: votingContract,
-    method: "getUserVotesForBookmark", // REAL: This method actually exists
-    params: account ? [account.address, BigInt(evermarkId)] : undefined,
-  });
-  
-  // REAL: Using actual method name "getAvailableVotingPower"
-  const { data: availableVotingPower, isLoading: isLoadingVotingPower } = useReadContract({
+    method: "getUserVotesForBookmark",
+    params: [account.address, BigInt(evermarkId)] as const,
+  }) : { data: undefined, isLoading: false };
+
+  const userVotes = userVotesQuery.data;
+  const isLoadingUserVotes = 'isLoading' in userVotesQuery ? userVotesQuery.isLoading : false;
+
+  // For reading voting power
+  const votingPowerQuery = account ? useReadContract({
     contract: catalogContract,
-    method: "getAvailableVotingPower", // REAL: This method actually exists
-    params: account ? [account.address] : undefined,
-  });
+    method: "getAvailableVotingPower", 
+    params: [account.address] as const,
+  }) : { data: undefined, isLoading: false };
+
+  const availableVotingPower = votingPowerQuery.data;
+  const isLoadingVotingPower = 'isLoading' in votingPowerQuery ? votingPowerQuery.isLoading : false;
   
   const { mutate: sendTransaction } = useSendTransaction();
   
@@ -85,11 +91,11 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
       return;
     }
     
-    const voteAmountWei = parseEther(voteAmount);
+    const voteAmountWei = toWei(voteAmount);
     
     // Check if user has enough voting power
     if (availableVotingPower && voteAmountWei > availableVotingPower) {
-      setError(`Insufficient voting power. Available: ${formatEther(availableVotingPower)} NSI`);
+      setError(`Insufficient voting power. Available: ${toEther(availableVotingPower)} NSI`);
       return;
     }
     
@@ -102,10 +108,10 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
       const transaction = prepareContractCall({
         contract: votingContract,
         method: "delegateVotes", // REAL: This method actually exists
-        params: [BigInt(evermarkId), voteAmountWei], // REAL: Correct parameters
+        params: [BigInt(evermarkId), voteAmountWei] as const, // REAL: Correct parameters
       });
       
-      await sendTransaction(transaction);
+      await sendTransaction(transaction as any);
       
       setSuccess(`Successfully delegated ${voteAmount} NSI to this Evermark!`);
       setVoteAmount("");
@@ -128,10 +134,10 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
       return;
     }
     
-    const withdrawAmountWei = parseEther(voteAmount);
+    const withdrawAmountWei = toWei(voteAmount);
     
     if (withdrawAmountWei > userVotes) {
-      setError(`Cannot withdraw more than delegated. Your delegation: ${formatEther(userVotes)} NSI`);
+      setError(`Cannot withdraw more than delegated. Your delegation: ${toEther(userVotes)} NSI`);
       return;
     }
     
@@ -147,7 +153,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
         params: [BigInt(evermarkId), withdrawAmountWei], // REAL: Correct parameters
       });
       
-      await sendTransaction(transaction);
+      await sendTransaction(transaction as any);
       
       setSuccess(`Successfully withdrew ${voteAmount} NSI from this Evermark!`);
       setVoteAmount("");
@@ -186,7 +192,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
             <div>
               <p className="text-sm text-gray-600">Total Votes</p>
               <p className="text-xl font-bold text-gray-900">
-                {isLoadingVotes ? "..." : formatEther(currentVotes || BigInt(0))}
+                {isLoadingVotes ? "..." : `${toEther(currentVotes || BigInt(0))}`}
               </p>
             </div>
           </div>
@@ -198,7 +204,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
             <div>
               <p className="text-sm text-gray-600">Your Votes</p>
               <p className="text-xl font-bold text-gray-900">
-                {isLoadingUserVotes ? "..." : formatEther(userVotes || BigInt(0))}
+                {isLoadingUserVotes ? "..." : `${toEther(userVotes || BigInt(0))}`}
               </p>
             </div>
           </div>
@@ -212,7 +218,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
             <div>
               <p className="text-sm text-gray-600">Available</p>
               <p className="text-xl font-bold text-gray-900">
-                {isLoadingVotingPower ? "..." : formatEther(availableVotingPower || BigInt(0))}
+                {isLoadingVotingPower ? "..." : toEther(availableVotingPower || BigInt(0))}
               </p>
             </div>
           </div>
@@ -272,15 +278,16 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
               )}
             </button>
             
-            {userVotes && userVotes > BigInt(0) && (
-              <button
-                onClick={handleUnvote}
-                disabled={isVoting || !voteAmount || parseFloat(voteAmount) <= 0}
-                className="flex-1 flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Withdraw
-              </button>
-            )}
+            {userVotes && userVotes > BigInt(0) ? (
+  <button onClick={handleUnvote}
+    disabled={isVoting || !voteAmount || parseFloat(voteAmount) <= 0}
+    className="flex-1 flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+  >
+    Withdraw
+  </button>
+) : null}
+
+
           </div>
           
           <p className="text-xs text-gray-500">

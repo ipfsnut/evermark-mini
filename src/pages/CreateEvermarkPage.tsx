@@ -1,17 +1,20 @@
-// src/pages/CreateEvermarkPage.tsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useActiveAccount } from "thirdweb/react";
-import { PlusIcon, LinkIcon } from 'lucide-react';
+import { PlusIcon, LinkIcon, AlertCircleIcon, CheckCircleIcon } from 'lucide-react';
+import { useEvermarkCreation } from '../hooks/useEvermarkCreation';
 
 const CreateEvermarkPage: React.FC = () => {
   const account = useActiveAccount();
+  const navigate = useNavigate();
+  const { createEvermark, isCreating, error, success } = useEvermarkCreation();
+  
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     sourceUrl: '',
     author: ''
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -23,17 +26,31 @@ const CreateEvermarkPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     
     try {
-      // TODO: Implement actual minting logic
-      console.log('Creating Evermark:', formData);
-      alert('Evermark creation not yet implemented - but form works!');
+      const result = await createEvermark({
+        title: formData.title,
+        description: formData.description,
+        sourceUrl: formData.sourceUrl,
+        author: formData.author
+      });
+      
+      if (result.success) {
+        // Reset form
+        setFormData({
+          title: '',
+          description: '',
+          sourceUrl: '',
+          author: ''
+        });
+        
+        // Redirect after a short delay
+        setTimeout(() => {
+          navigate('/my-evermarks');
+        }, 2000);
+      }
     } catch (error) {
       console.error('Error creating evermark:', error);
-      alert('Error creating evermark');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -56,6 +73,21 @@ const CreateEvermarkPage: React.FC = () => {
             <p className="text-gray-600">Preserve valuable content on the blockchain</p>
           </div>
         </div>
+        
+        {/* Status Messages */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center">
+            <AlertCircleIcon className="h-5 w-5 text-red-600 mr-2" />
+            <span className="text-red-700">{error}</span>
+          </div>
+        )}
+        
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center">
+            <CheckCircleIcon className="h-5 w-5 text-green-600 mr-2" />
+            <span className="text-green-700">{success}</span>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -130,10 +162,10 @@ const CreateEvermarkPage: React.FC = () => {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isSubmitting || !formData.title}
+            disabled={isCreating || !formData.title}
             className="w-full flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? (
+            {isCreating ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 Creating...

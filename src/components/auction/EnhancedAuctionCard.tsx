@@ -1,11 +1,6 @@
-// src/components/auction/AuctionCard.tsx - USING REAL CONTRACT METHODS
 import React, { useState, useEffect } from "react";
-import { useReadContract, useSendTransaction, useActiveAccount } from "thirdweb/react";
-import { getContract, prepareContractCall } from "thirdweb";
-import { toEther, toWei } from "thirdweb/utils";
-import { client } from "../../lib/thirdweb";
-import { CONTRACT_ADDRESSES, CHAIN } from "../../config/constants";
-import { AUCTION_ABI } from "../../lib/contracts"; // REAL: Using actual ABI import
+import { useWallet } from "../../hooks/useWallet";
+import { useAuctionDetails } from "../../hooks/useAuctions";
 import { 
   DollarSignIcon, 
   ClockIcon, 
@@ -14,82 +9,28 @@ import {
   CheckCircleIcon,
   GavelIcon 
 } from 'lucide-react';
+import { toEther } from "thirdweb/utils";
+import { Link } from "react-router-dom";
 
-interface AuctionCardProps {
+interface EnhancedAuctionCardProps {
   auctionId: string;
 }
 
-// REAL: Using the actual auction struct from the contract ABI
-interface AuctionDetails {
-  tokenId: bigint;
-  nftContract: string;
-  seller: string;
-  startingPrice: bigint;
-  reservePrice: bigint;
-  currentBid: bigint;
-  highestBidder: string;
-  startTime: bigint;
-  endTime: bigint;
-  finalized: boolean;
-}
-
-export function AuctionCard({ auctionId }: AuctionCardProps) {
-  const account = useActiveAccount();
+export function EnhancedAuctionCard({ auctionId }: EnhancedAuctionCardProps) {
+  const { address, isConnected } = useWallet();
   const [bidAmount, setBidAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isBidding, setIsBidding] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState<string>("");
   
-  // REAL: Using actual contract address and ABI
-  const contract = getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACT_ADDRESSES.BOOKMARK_AUCTION, // REAL: Using BOOKMARK_AUCTION not "AUCTION"
-    abi: AUCTION_ABI, // REAL: Using actual ABI from contracts file
-  });
-  
-  // REAL: Using actual method "getAuctionDetails" with correct return type
-  const { data: auctionData, isLoading, error: contractError } = useReadContract({
-    contract,
-    method: "getAuctionDetails", // REAL: This method actually exists
-    params: [BigInt(auctionId)],
-  });
-  
-  const { mutate: sendTransaction } = useSendTransaction();
-  
-  // Calculate time remaining
-  useEffect(() => {
-    if (!auctionData) return;
-    
-    const updateTimeRemaining = () => {
-      const now = Math.floor(Date.now() / 1000);
-      const endTime = Number(auctionData.endTime);
-      const remaining = endTime - now;
-      
-      if (remaining <= 0) {
-        setTimeRemaining("Auction ended");
-        return;
-      }
-      
-      const days = Math.floor(remaining / 86400);
-      const hours = Math.floor((remaining % 86400) / 3600);
-      const minutes = Math.floor((remaining % 3600) / 60);
-      
-      if (days > 0) {
-        setTimeRemaining(`${days}d ${hours}h remaining`);
-      } else if (hours > 0) {
-        setTimeRemaining(`${hours}h ${minutes}m remaining`);
-      } else {
-        setTimeRemaining(`${minutes}m remaining`);
-      }
-    };
-    
-    updateTimeRemaining();
-    const interval = setInterval(updateTimeRemaining, 60000); // Update every minute
-    
-    return () => clearInterval(interval);
-  }, [auctionData]);
+  const {
+    auction,
+    isLoading,
+    timeRemaining,
+    placeBid,
+    isAuctionEnded,
+    hasActiveBid,
+  } = useAuctionDetails(auctionId);
   
   // Clear messages after 5 seconds
   useEffect(() => {
@@ -103,7 +44,7 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
   }, [success, error]);
   
   const handleBid = async () => {
-    if (!account) {
+    if (!address) {
       setError("Please connect your wallet");
       return;
     }
@@ -113,48 +54,19 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
       return;
     }
     
-    if (!auctionData) {
-      setError("Auction data not available");
-      return;
-    }
-    
-    const bidAmountWei = toWei(bidAmount);
-    const minBid = auctionData.currentBid > BigInt(0) 
-      ? auctionData.currentBid + toWei("0.01") // Minimum increment
-      : auctionData.startingPrice;
-    
-    if (bidAmountWei < minBid) {
-      setError(`Bid must be at least ${toEther(minBid)} ETH`);
-      return;
-    }
-    
-    // Check if auction has ended
-    const now = Math.floor(Date.now() / 1000);
-    if (Number(auctionData.endTime) <= now) {
-      setError("Auction has ended");
-      return;
-    }
-    
     setIsBidding(true);
     setError(null);
     setSuccess(null);
     
     try {
-      // REAL: Using actual method "placeBid" with correct parameters
-      const transaction = prepareContractCall({
-        contract,
-        method: "placeBid", // REAL: This method actually exists
-        params: [BigInt(auctionId)], // REAL: Only auctionId parameter
-        value: bidAmountWei, // REAL: ETH amount sent as value
-      });
+      const result = await placeBid(bidAmount);
       
-      await sendTransaction(transaction);
-      
-      setSuccess(`Successfully placed bid of ${bidAmount} ETH!`);
-      setBidAmount("");
-    } catch (err: any) {
-      console.error("Error placing bid:", err);
-      setError(err.message || "Failed to place bid");
+      if (result.success) {
+        setSuccess(result.message ?? "Bid placed successfully!");
+        setBidAmount("");
+      } else {
+        setError(result.error ?? "Failed to place bid");
+      }
     } finally {
       setIsBidding(false);
     }
@@ -172,7 +84,7 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
     );
   }
   
-  if (contractError || !auctionData) {
+  if (!auction) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-6 border border-red-200">
         <div className="text-center py-4">
@@ -183,11 +95,7 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
     );
   }
   
-  // REAL: Properly casting the auction data to the correct type
-  const auction = auctionData as AuctionDetails;
-  const isAuctionEnded = Math.floor(Date.now() / 1000) >= Number(auction.endTime);
-  const isUserSeller = account?.address.toLowerCase() === auction.seller.toLowerCase();
-  const hasActiveBid = auction.currentBid > BigInt(0);
+  const isUserSeller = address?.toLowerCase() === auction.seller.toLowerCase();
   
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -197,7 +105,9 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
           <div className="flex items-center">
             <GavelIcon className="h-5 w-5 text-green-600 mr-2" />
             <h3 className="text-lg font-semibold text-gray-900">
-              Evermark #{auction.tokenId.toString()}
+              <Link to={`/evermark/${auction.tokenId.toString()}`} className="hover:text-green-700 transition-colors">
+                Evermark #{auction.tokenId.toString()}
+              </Link>
             </h3>
           </div>
           <div className="flex items-center text-sm text-gray-600">
@@ -260,7 +170,7 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
         )}
         
         {/* Bidding Interface */}
-        {!isAuctionEnded && !isUserSeller && account && (
+        {!isAuctionEnded && !isUserSeller && isConnected && (
           <div className="space-y-4">
             <div>
               <label htmlFor="bid-amount" className="block text-sm font-medium text-gray-700 mb-2">
@@ -272,8 +182,8 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
                 value={bidAmount}
                 onChange={(e) => setBidAmount(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                placeholder={`Min: ${toEther(hasActiveBid ? auction.currentBid + toWei("0.01") : auction.startingPrice)}`}
-                min={toEther(hasActiveBid ? auction.currentBid + toWei("0.01") : auction.startingPrice)}
+                placeholder={`Min: ${toEther(hasActiveBid ? auction.currentBid + BigInt(10000000000000000) : auction.startingPrice)}`}
+                min={toEther(hasActiveBid ? auction.currentBid + BigInt(10000000000000000) : auction.startingPrice)}
                 step="0.01"
               />
             </div>
@@ -316,7 +226,7 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
           </div>
         )}
         
-        {!account && (
+        {!isConnected && (
           <div className="text-center py-4 bg-gray-50 rounded-lg">
             <p className="text-gray-600">Connect your wallet to participate</p>
           </div>
