@@ -3,8 +3,14 @@
   command = "vite build"
   publish = "dist"
   environment = { NODE_VERSION = "20" }
+  functions = "netlify/functions"
 
-# SPA redirect for client-side routing
+# SPA redirect for client-side routing (but exclude functions)
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

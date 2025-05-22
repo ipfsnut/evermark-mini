@@ -22,35 +22,44 @@ export function useStaking(userAddress?: string) {
     abi: CARD_CATALOG_ABI,
   });
   
-  // Get total staked amount (wrapped tokens)
-  const totalStakedQuery = userAddress ? useReadContract({
+  // Get total staked amount (wrapped tokens) - Always call hook
+  const totalStakedQuery = useReadContract({
     contract: catalogContract,
     method: "balanceOf",
-    params: [userAddress] as const,
-  }) : { data: undefined, isLoading: false };
+    params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
+    queryOptions: {
+      enabled: !!userAddress,
+    },
+  });
   
   const totalStaked = totalStakedQuery.data;
-  const isLoadingTotalStaked = 'isLoading' in totalStakedQuery ? totalStakedQuery.isLoading : false;
+  const isLoadingTotalStaked = totalStakedQuery.isLoading;
   
-  // Get available voting power
-  const votingPowerQuery = userAddress ? useReadContract({
+  // Get available voting power - Always call hook
+  const votingPowerQuery = useReadContract({
     contract: catalogContract,
     method: "getAvailableVotingPower",
-    params: [userAddress] as const,
-  }) : { data: undefined, isLoading: false };
+    params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
+    queryOptions: {
+      enabled: !!userAddress,
+    },
+  });
   
   const availableVotingPower = votingPowerQuery.data;
-  const isLoadingVotingPower = 'isLoading' in votingPowerQuery ? votingPowerQuery.isLoading : false;
+  const isLoadingVotingPower = votingPowerQuery.isLoading;
   
-  // Get unbonding requests
-  const unbondingRequestsQuery = userAddress ? useReadContract({
+  // Get unbonding requests - Always call hook
+  const unbondingRequestsQuery = useReadContract({
     contract: catalogContract,
     method: "getUnbondingRequests",
-    params: [userAddress] as const,
-  }) : { data: undefined, isLoading: false };
+    params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
+    queryOptions: {
+      enabled: !!userAddress,
+    },
+  });
   
   const unbondingRequests = unbondingRequestsQuery.data;
-  const isLoadingUnbondingRequests = 'isLoading' in unbondingRequestsQuery ? unbondingRequestsQuery.isLoading : false;
+  const isLoadingUnbondingRequests = unbondingRequestsQuery.isLoading;
   
   const { mutate: sendTransaction } = useSendTransaction();
   
@@ -80,6 +89,12 @@ export function useStaking(userAddress?: string) {
       });
       
       await sendTransaction(transaction as any);
+      
+      // Refetch data after successful transaction
+      setTimeout(() => {
+        totalStakedQuery.refetch();
+        votingPowerQuery.refetch();
+      }, 2000);
       
       const successMsg = `Successfully staked ${amount} NSI`;
       setSuccess(successMsg);
@@ -126,6 +141,12 @@ export function useStaking(userAddress?: string) {
       
       await sendTransaction(transaction as any);
       
+      // Refetch data after successful transaction
+      setTimeout(() => {
+        totalStakedQuery.refetch();
+        unbondingRequestsQuery.refetch();
+      }, 2000);
+      
       const successMsg = `Successfully requested unstaking of ${amount} NSI. Please wait for the unbonding period to complete.`;
       setSuccess(successMsg);
       return { success: true, message: successMsg };
@@ -159,6 +180,13 @@ export function useStaking(userAddress?: string) {
       
       await sendTransaction(transaction as any);
       
+      // Refetch data after successful transaction
+      setTimeout(() => {
+        totalStakedQuery.refetch();
+        unbondingRequestsQuery.refetch();
+        votingPowerQuery.refetch();
+      }, 2000);
+      
       const successMsg = `Successfully unstaked your NSI tokens!`;
       setSuccess(successMsg);
       return { success: true, message: successMsg };
@@ -191,6 +219,12 @@ export function useStaking(userAddress?: string) {
       });
       
       await sendTransaction(transaction as any);
+      
+      // Refetch data after successful transaction
+      setTimeout(() => {
+        totalStakedQuery.refetch();
+        unbondingRequestsQuery.refetch();
+      }, 2000);
       
       const successMsg = `Successfully cancelled unbonding request!`;
       setSuccess(successMsg);
