@@ -1,3 +1,4 @@
+// src/main.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -10,12 +11,12 @@ const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AppThirdwebProvider>
+    <BrowserRouter>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
+        <AppThirdwebProvider>
           <App />
-        </BrowserRouter>
+        </AppThirdwebProvider>
       </QueryClientProvider>
-    </AppThirdwebProvider>
+    </BrowserRouter>
   </React.StrictMode>,
 );
