@@ -1,5 +1,14 @@
 # 🚀 Evermark Implementation Progress Report - MAJOR UPDATE
 
+## New Features:
+- Rewards distribution system. Flow - trading fees -> rewards -> stakers.
+- NFT staking. Concept: user stakes NFT (promising not to sell) and receives $NSI staking rewards for staked NFT equal to the number of $NSI delegations it received the prior week.
+- NFT metadata upgrade. Concept: user includes URL, selects type tag (Cast, DOI, ISBN, URL), selects content tags, metadata collection form appears & collects all relevant metadata as well as any custom metadata key/value pairs the user adds.
+- NFT Delegation History. Concept: every delegation adds the delegated-to content to the user's My Evermarks/Supported tab. Evermarks available here can be tagged to My Bookshelf (new page), and all Locked In Evermarks (staked Evermark NFTs) are visible under My Locked In Evermarks. Users can view each other's Evermarks & history. 
+- Delegation History Based Rewards. Concept: users receive more rewards if they use all their delegations each week.
+- Webhook - finish this out.
+
+
 ## 🎯 **Current Status: 95% COMPLETE - READY FOR LAUNCH!**
 
 ### 🎉 **BREAKTHROUGH ACHIEVED - Webhook System LIVE!**
